@@ -312,7 +312,7 @@ describe('parseHouseholdLocation', () => {
 
 	it('returns null, not a default, for malformed input', () => {
 		expect(parseHouseholdLocation('nonsense')).toBeNull();
-		expect(parseHouseholdLocation('45.0')).toBeNull();
+		expect(parseHouseholdLocation('45.5')).toBeNull();
 		expect(parseHouseholdLocation('')).toBeNull();
 	});
 

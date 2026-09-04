@@ -878,7 +878,7 @@ so the display doesn't go blank for days at a time just because nothing is happe
 the next 48 hours.
 
 Type runs about 1.6× the standard view and touch targets are at least 56px. Their visible
-sources are their own calendar, Family, Shared, Visitors and Holidays — no "Other
+sources are their own calendar, Family, Joint, Visitors and Holidays — no "Other
 people", no football.
 
 They keep a PIN. A young child will happily tell a friend what it is, which is fine — the

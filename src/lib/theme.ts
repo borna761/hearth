@@ -30,7 +30,7 @@ const ONE_DAY_MS = 24 * 60 * 60_000;
 /** True when `now` falls in this suncalc day's [sunrise, sunset). suncalc types sunrise/
  * sunset as nullable because they genuinely can be, at high enough latitudes to lose a
  * sunrise or sunset entirely for stretches of the year (polar day/night) — the default
- * Springfield location (45°N) is nowhere near the 66.5° polar circles where that happens,
+ * Springfield location (45.5°N) is nowhere near the 66.5° polar circles where that happens,
  * but a household-configured location could be closer. Treating a missing value as "not
  * light" is a safe, inert fallback either way, not something worth designing further
  * around for a case this app's one household is unlikely to actually hit. */

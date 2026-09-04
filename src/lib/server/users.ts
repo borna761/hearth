@@ -36,7 +36,7 @@ export async function listPublicUsers(db: Db): Promise<PublicUser[]> {
 		.orderBy(users.sortOrder);
 }
 
-/** Settings screen's per-user color change (§7.5's "he configures the whole household"
+/** Settings screen's per-user color change (§7.5's "the admin configures the whole household"
  * pattern, same as PIN reset) — the caller validates the hex format. */
 export async function setUserColor(db: Db, userId: number, color: string): Promise<void> {
 	await db.update(users).set({ color }).where(eq(users.id, userId));
