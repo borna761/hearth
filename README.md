@@ -15,6 +15,36 @@ household NAS.
 - **Follows the sun.** Light between sunrise and sunset, dark otherwise, computed
   locally so the theme never depends on a network call.
 
+## Screenshots
+
+From a demo instance seeded with fictional household members and made-up events — the
+actual app running, not mockups.
+
+**Screensaver** — cycling household photos with a drifting clock; tapping reveals the
+lock screen.
+
+![Screensaver](docs/screenshots/01-screensaver.jpg)
+
+**Lock screen** — one PIN per person.
+
+![Avatar picker](docs/screenshots/02-avatar-picker.png)
+
+**Week view** — the week, at a glance.
+
+![Week view](docs/screenshots/03-week-view.png)
+
+**Simple view** — for a younger household member: just what's next, in large type.
+
+![Simple view](docs/screenshots/04-simple-view.png)
+
+**Groceries** — a shared list, grouped by category, one tap from the screensaver.
+
+![Groceries](docs/screenshots/06-groceries.jpg)
+
+**Settings** — per-person calendar visibility, quiet hours, and more.
+
+![Settings](docs/screenshots/05-settings.png)
+
 ## Design
 
 The architecture, data model, access model, performance budget and build phases are
