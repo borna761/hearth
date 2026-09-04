@@ -1,0 +1,5 @@
+# Lets the hearth account restart its own service from scripts/deploy.sh without a
+# login password, and nothing else.
+# Install: sudo install -m 0440 deploy/sudoers-hearth-deploy /etc/sudoers.d/hearth-deploy
+#          sudo visudo -c   # validates every file in sudoers.d
+hearth ALL=(root) NOPASSWD: /usr/bin/systemctl restart hearth, /usr/bin/systemctl status hearth

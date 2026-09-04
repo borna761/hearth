@@ -1,0 +1,1 @@
+ALTER TABLE `pending_writes` ADD `next_attempt_at` integer;

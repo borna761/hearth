@@ -1,0 +1,11 @@
+@import 'tailwindcss';
+
+/* DESIGN.md §5.3: theme is server-decided (sunrise/sunset via computeTheme) and applied
+   here as a class the client never computes itself — see +page.svelte's `dark` toggle. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html {
+	transition:
+		background-color 2s ease,
+		color 2s ease;
+}

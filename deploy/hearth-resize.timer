@@ -1,0 +1,18 @@
+# Nightly at 03:10 — inside the tablet's 22:00-07:00 quiet hours (DESIGN.md §9.2), ten
+# minutes after hearth-backup.timer purely to avoid competing with it for CPU/memory (the
+# backup itself no longer needs the database quiet — see hearth-backup.service). The
+# memory-cap headroom reasoning in DESIGN.md §6 ("the only moment both units are warm is
+# 03:00 — zram absorbing the overlap") is unaffected by this stagger — it's still both warm
+# within the same quiet-hours window, just not the same instant.
+# Install: sudo cp deploy/hearth-resize.* /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now hearth-resize.timer
+[Unit]
+Description=Run the Hearth nightly photo resize at 03:10
+
+[Timer]
+OnCalendar=*-*-* 03:10:00
+Persistent=true
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

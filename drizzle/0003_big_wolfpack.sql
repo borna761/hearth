@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `week_view` text DEFAULT 'agenda' NOT NULL;

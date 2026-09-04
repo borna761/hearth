@@ -1,0 +1,15 @@
+# Nightly database backup (Online Backup API, scripts/lib/backup-online.mjs) — DESIGN.md
+# §3.5. A oneshot service triggered by hearth-backup.timer; not started directly. Scheduled
+# to run first, ahead of resize and music-scan (deploy/hearth-resize.timer,
+# deploy/hearth-music-scan.timer) purely to keep CPU/memory contention low at 03:00 — the
+# backup mechanism itself no longer needs a quiet database to succeed.
+[Unit]
+Description=Hearth nightly database backup
+RequiresMountsFor=/mnt/nas
+
+[Service]
+Type=oneshot
+User=hearth
+Group=hearth
+EnvironmentFile=/etc/hearth/hearth.env
+ExecStart=/usr/bin/node /opt/hearth/current/scripts/backup.mjs

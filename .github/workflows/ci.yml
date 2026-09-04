@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      # Only src/lib/server/db/index.ts's own presence check reads this at import time
+      # (`$env/dynamic/private` — real DATABASE_URL, not just .env.example's documentation
+      # value) — every test that actually opens a database uses its own in-memory
+      # better-sqlite3 + migrate() (CLAUDE.md), so the value itself is never read.
+      DATABASE_URL: ':memory:'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run check
+      - run: npm test

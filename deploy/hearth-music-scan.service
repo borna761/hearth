@@ -1,0 +1,33 @@
+# Nightly music library scan — docs/phase-7-music-plan.md. A oneshot service triggered by
+# hearth-music-scan.timer; not started directly. A directory walk + stat() + small SQL
+# upserts, plus reading each mp3's ID3 tag (music-metadata, pure JS) to extract its
+# embedded cover art if it has one, then resizing that down via sharp/libvips
+# (music-cover-resize.mjs) before caching it — same library hearth-resize.service already
+# uses for photos, just on much smaller images. MemoryMax matches hearth-resize.service's
+# for now since libvips' own baseline overhead is the same regardless of image size;
+# unmeasured against a real scan on the Pi, worth tightening once it's been observed.
+#
+# Also the first NAS-scan job that needs real internet access, not just the LAN: any track
+# still missing artist/album/year/cover art after the ID3 read gets looked up against
+# musicbrainz.org and coverartarchive.org (enrich-music-metadata.mjs), rate-limited to
+# ~1 request/second per MusicBrainz's usage policy — a first backfill run over a library
+# with many still-unenriched tracks can take noticeably longer than a normal night's scan
+# (a handful of tracks needing a lookup is seconds; dozens can be a minute or more). A
+# lookup failure (musicbrainz.org unreachable, no match found) just leaves that track's
+# metadata as-is rather than failing the run.
+[Unit]
+Description=Hearth nightly music library scan
+RequiresMountsFor=/mnt/nas
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=hearth
+Group=hearth
+EnvironmentFile=/etc/hearth/hearth.env
+ExecStart=/usr/bin/node /opt/hearth/current/scripts/scan-music.mjs
+MemoryMax=192M
+CPUWeight=20
+IOWeight=20
+Nice=19

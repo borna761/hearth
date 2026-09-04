@@ -1,0 +1,1133 @@
+<title>Hearth Architecture</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600;700&family=Newsreader:opsz,wght@6..72,300;6..72,400;6..72,500&display=swap">
+
+<style>
+  :root {
+    --ground:   #F3F4F3;
+    --surface:  #FFFFFF;
+    --sunken:   #EAECEB;
+    --ink:      #151A19;
+    --muted:    #5C6866;
+    --faint:    #8A9694;
+    --rule:     #DEE1DF;
+    --accent:   #0E7C7B;
+    --accent-sf:#E2EFEE;
+
+    --p-teal:   #0E7C7B;
+    --p-amber:  #A8722A;
+    --p-plum:   #7C4A73;
+
+    --ok:       #3F7D4E;
+    --warn:     #A8722A;
+    --crit:     #B23F3F;
+    --ok-sf:    #E4EDE6;
+    --warn-sf:  #F2EADC;
+    --crit-sf:  #F3E3E3;
+
+    --sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+    --serif: "Newsreader", Georgia, "Times New Roman", serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --measure: 66ch;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:   #0E1211;
+      --surface:  #171C1B;
+      --sunken:   #121716;
+      --ink:      #E4E8E7;
+      --muted:    #97A4A1;
+      --faint:    #6B7876;
+      --rule:     #262E2D;
+      --accent:   #47B3B0;
+      --accent-sf:#14302F;
+
+      --p-teal:   #47B3B0;
+      --p-amber:  #D3A055;
+      --p-plum:   #B486AB;
+
+      --ok:       #6FAE7C;
+      --warn:     #D3A055;
+      --crit:     #DD7A7A;
+      --ok-sf:    #1A2A1E;
+      --warn-sf:  #2E2617;
+      --crit-sf:  #2E1B1B;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground:   #0E1211;
+    --surface:  #171C1B;
+    --sunken:   #121716;
+    --ink:      #E4E8E7;
+    --muted:    #97A4A1;
+    --faint:    #6B7876;
+    --rule:     #262E2D;
+    --accent:   #47B3B0;
+    --accent-sf:#14302F;
+
+    --p-teal:   #47B3B0;
+    --p-amber:  #D3A055;
+    --p-plum:   #B486AB;
+
+    --ok:       #6FAE7C;
+    --warn:     #D3A055;
+    --crit:     #DD7A7A;
+    --ok-sf:    #1A2A1E;
+    --warn-sf:  #2E2617;
+    --crit-sf:  #2E1B1B;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 18px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+    padding: 0 24px 120px;
+  }
+
+  .shell {
+    max-width: 1160px;
+    margin: 0 auto;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    padding: 76px 0 34px;
+    border-bottom: 1px solid var(--rule);
+    margin-bottom: 52px;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 14px;
+    align-items: center;
+  }
+  .eyebrow .sep { color: var(--faint); }
+
+  h1 {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: clamp(2.4rem, 6vw, 3.6rem);
+    line-height: 1.02;
+    letter-spacing: -0.035em;
+    text-wrap: balance;
+    margin: 0 0 18px;
+  }
+
+  .standfirst {
+    font-size: 1.24rem;
+    line-height: 1.5;
+    color: var(--muted);
+    font-weight: 300;
+    max-width: 54ch;
+    margin: 0;
+  }
+
+  .meta-row {
+    margin-top: 30px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.05em;
+    padding: 5px 10px;
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    color: var(--muted);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+  .tag.live { color: var(--accent); border-color: var(--accent); background: var(--accent-sf); }
+
+  /* ---------- layout ---------- */
+
+  .body-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 48px;
+    align-items: start;
+  }
+
+  @media (min-width: 1000px) {
+    .body-grid { grid-template-columns: 194px minmax(0, 1fr); gap: 64px; }
+    nav.toc { position: sticky; top: 32px; }
+  }
+
+  nav.toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    counter-reset: toc;
+  }
+  nav.toc a {
+    font-family: var(--sans);
+    font-size: 13px;
+    line-height: 1.35;
+    color: var(--muted);
+    text-decoration: none;
+    display: grid;
+    grid-template-columns: 22px 1fr;
+    gap: 6px;
+    padding: 6px 8px 6px 0;
+    border-radius: 3px;
+    transition: color 0.12s ease;
+  }
+  nav.toc li { counter-increment: toc; }
+  nav.toc a::before {
+    content: counter(toc);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    padding-top: 2px;
+  }
+  nav.toc a:hover { color: var(--accent); }
+  nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .toc-label {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--faint);
+    margin: 0 0 14px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  main { min-width: 0; }
+
+  /* ---------- sections ---------- */
+
+  section { margin-bottom: 68px; scroll-margin-top: 28px; }
+
+  h2 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 1.66rem;
+    letter-spacing: -0.02em;
+    line-height: 1.18;
+    text-wrap: balance;
+    margin: 0 0 8px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 14px;
+    align-items: baseline;
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    font-weight: 400;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+  }
+
+  .sec-rule {
+    height: 2px;
+    background: var(--ink);
+    margin: 0 0 26px;
+    opacity: 0.85;
+  }
+
+  h3 {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 1.06rem;
+    letter-spacing: -0.005em;
+    margin: 38px 0 10px;
+    color: var(--ink);
+  }
+  h3 .h3num { font-family: var(--mono); font-weight: 400; font-size: 0.82em; color: var(--faint); margin-right: 8px; }
+
+  p { margin: 0 0 17px; max-width: var(--measure); }
+  main > section > p:first-of-type { margin-top: 0; }
+
+  ul, ol.prose { max-width: var(--measure); padding-left: 20px; margin: 0 0 17px; }
+  li { margin-bottom: 8px; }
+  li::marker { color: var(--faint); }
+
+  strong { font-weight: 500; font-family: var(--sans); font-size: 0.95em; }
+  em { font-style: italic; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.83em;
+    background: var(--sunken);
+    border: 1px solid var(--rule);
+    border-radius: 3px;
+    padding: 1px 5px;
+    white-space: nowrap;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    line-height: 1.62;
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 5px;
+    padding: 18px 20px;
+    overflow-x: auto;
+    margin: 0 0 22px;
+    color: var(--ink);
+  }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; white-space: pre; }
+
+  a.inline { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; text-decoration-thickness: 1px; }
+
+  /* ---------- callouts ---------- */
+
+  .note {
+    border-left: 2px solid var(--accent);
+    background: var(--accent-sf);
+    padding: 16px 20px;
+    margin: 0 0 22px;
+    border-radius: 0 4px 4px 0;
+    max-width: var(--measure);
+  }
+  .note p:last-child { margin-bottom: 0; }
+  .note .kicker {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 7px;
+  }
+
+  .consequence {
+    border-left: 2px solid var(--ink);
+    padding: 2px 0 2px 18px;
+    margin: 0 0 22px;
+    max-width: var(--measure);
+  }
+  .consequence p { margin: 0; }
+
+  /* ---------- tables ---------- */
+
+  .scroller { overflow-x: auto; margin: 0 0 24px; border: 1px solid var(--rule); border-radius: 5px; background: var(--surface); }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-family: var(--sans);
+    font-size: 13.5px;
+    line-height: 1.45;
+    font-variant-numeric: tabular-nums;
+  }
+  th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule);
+    background: var(--sunken);
+    white-space: nowrap;
+  }
+  td {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--rule);
+    vertical-align: top;
+    color: var(--ink);
+  }
+  tr:last-child td { border-bottom: none; }
+  td.tight { white-space: nowrap; }
+
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.04em;
+    padding: 3px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .chip.ok   { color: var(--ok);   background: var(--ok-sf); }
+  .chip.warn { color: var(--warn); background: var(--warn-sf); }
+  .chip.crit { color: var(--crit); background: var(--crit-sf); }
+
+  /* ---------- constraint cards ---------- */
+
+  .constraints { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 5px; overflow: hidden; margin-bottom: 26px; }
+  @media (min-width: 720px) { .constraints { grid-template-columns: 1fr 1fr; } }
+  .cx { background: var(--surface); padding: 18px 20px; }
+  .cx h4 {
+    font-family: var(--sans);
+    font-size: 13.5px;
+    font-weight: 600;
+    margin: 0 0 6px;
+    letter-spacing: -0.005em;
+  }
+  .cx p { font-size: 14px; line-height: 1.5; color: var(--muted); margin: 0; max-width: none; }
+  .cx .cxnum { font-family: var(--mono); font-size: 10.5px; color: var(--accent); display: block; margin-bottom: 8px; letter-spacing: 0.08em; }
+
+  /* ---------- people ---------- */
+
+  .people { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 22px; }
+  .person {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--sans); font-size: 13px;
+    border: 1px solid var(--rule); background: var(--surface);
+    padding: 6px 13px 6px 9px; border-radius: 999px;
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+
+  /* ---------- diagram ---------- */
+
+  figure { margin: 0 0 24px; }
+  figcaption {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--faint);
+    margin-top: 10px;
+    letter-spacing: 0.03em;
+  }
+  svg { display: block; width: 100%; height: auto; }
+
+  /* ---------- phases ---------- */
+
+  .phases { list-style: none; padding: 0; margin: 0; counter-reset: ph; max-width: var(--measure); }
+  .phases li {
+    counter-increment: ph;
+    display: grid;
+    grid-template-columns: 30px 1fr;
+    gap: 14px;
+    padding: 15px 0;
+    border-bottom: 1px solid var(--rule);
+    margin: 0;
+  }
+  .phases li:last-child { border-bottom: none; }
+  .phases li::before {
+    content: counter(ph);
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--accent);
+    background: var(--accent-sf);
+    border-radius: 3px;
+    height: 24px;
+    display: grid;
+    place-items: center;
+    margin-top: 2px;
+  }
+  .phases .pt { font-family: var(--sans); font-weight: 600; font-size: 14.5px; display: block; margin-bottom: 3px; }
+  .phases .pd { font-size: 15px; color: var(--muted); line-height: 1.5; }
+
+  /* ---------- questions ---------- */
+
+  ol.q { list-style: none; padding: 0; margin: 0; counter-reset: qq; max-width: var(--measure); }
+  ol.q li {
+    counter-increment: qq;
+    display: grid; grid-template-columns: 26px 1fr; gap: 12px;
+    padding: 13px 0; border-bottom: 1px solid var(--rule); margin: 0;
+  }
+  ol.q li:last-child { border-bottom: none; }
+  ol.q li::before {
+    content: "Q" counter(qq);
+    font-family: var(--mono); font-size: 11px; color: var(--faint); padding-top: 3px;
+  }
+
+  footer {
+    margin-top: 72px; padding-top: 22px; border-top: 1px solid var(--rule);
+    font-family: var(--mono); font-size: 11px; color: var(--faint); letter-spacing: 0.04em;
+    display: flex; flex-wrap: wrap; gap: 8px 18px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; animation: none !important; }
+  }
+</style>
+
+<style>
+  .vis td.c { text-align: center; font-family: var(--mono); font-size: 13px; }
+  .vis .yes { color: var(--accent); } .vis .no { color: var(--faint); } .vis .ex { color: var(--crit); }
+  .vis tr.excluded td:first-child { text-decoration: line-through; color: var(--muted); }
+  .roles td:first-child { font-family: var(--sans); font-weight: 600; white-space: nowrap; }
+  .changed { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em; line-height: 1.6;
+    color: var(--warn); background: var(--warn-sf); padding: 8px 12px; border-radius: 3px;
+    display: block; margin-bottom: 18px; max-width: var(--measure); }
+  .budget { display: grid; gap: 1px; background: var(--rule); border: 1px solid var(--rule);
+    border-radius: 5px; overflow: hidden; margin: 0 0 22px; max-width: var(--measure); }
+  .budget div { background: var(--surface); padding: 12px 16px; font-family: var(--sans); font-size: 14px; }
+  .budget span { font-family: var(--mono); font-size: 11px; color: var(--accent); display: block; margin-bottom: 3px; letter-spacing: 0.06em; }
+  .danger { border-left: 2px solid var(--crit); background: var(--crit-sf); padding: 16px 20px;
+    margin: 0 0 22px; border-radius: 0 4px 4px 0; max-width: var(--measure); }
+  .danger .kicker { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.12em;
+    text-transform: uppercase; color: var(--crit); display: block; margin-bottom: 7px; }
+  .danger p:last-child { margin-bottom: 0; }
+
+  /* ---- device mockups ---- */
+  .mocks { display: grid; grid-template-columns: 1fr; gap: 18px; margin: 0 0 14px; }
+  @media (min-width: 700px) { .mocks { grid-template-columns: 1fr 1fr; } }
+  .mock { border: 1px solid var(--rule); border-radius: 6px; overflow: hidden; }
+  .mock-cap { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--muted);
+    padding: 7px 11px; border-bottom: 1px solid var(--rule); background: var(--sunken); }
+  .screen { aspect-ratio: 16/10; background: #0F1413; color: #E8ECEA;
+    font-family: var(--sans); padding: 9px; display: flex; flex-direction: column; gap: 7px; }
+  .m-top { display: flex; align-items: center; gap: 8px; font-size: 8px; color: #8A9895; }
+  .m-user { color: #47B3B0; border: 1px solid #2A3E3D; border-radius: 8px; padding: 2px 7px; font-weight: 600; }
+  .m-top .sp { margin-left: auto; }
+  .m-clock { font-family: var(--mono); color: #E8ECEA; font-size: 10px; }
+  .m-week { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; flex: 1; }
+  .m-day { background: #19201E; border-radius: 3px; padding: 4px 3px; display: flex; flex-direction: column; gap: 2px; }
+  .m-day.today { background: #16302E; }
+  .m-dl { font-family: var(--mono); font-size: 5.5px; color: #6E7C79; letter-spacing: 0.08em; }
+  .m-dn { font-family: var(--mono); font-size: 8px; color: #C8D0CE; margin-bottom: 1px; }
+  .chipx { height: 6px; border-radius: 1.5px; font-size: 4.5px; }
+  .m-rail { position: absolute; }
+  .m-bottom { display: flex; gap: 5px; font-size: 7px; color: #8A9895; }
+  .m-bottom div { background: #19201E; border-radius: 3px; padding: 4px 6px; flex: 1; }
+
+  .screen.simple { gap: 6px; }
+  .m-date { font-size: 15px; font-weight: 700; line-height: 1.05; letter-spacing: -0.02em; }
+  .m-date span { display: block; font-size: 8px; font-weight: 400; color: #8A9895; margin-top: 2px; }
+  .m-next { background: #19201E; border-left: 3px solid #B486AB; border-radius: 4px;
+    padding: 8px 10px; flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 3px; }
+  .m-lab { font-family: var(--mono); font-size: 5.5px; letter-spacing: 0.14em; color: #6E7C79; }
+  .m-nt { font-size: 13px; font-weight: 600; letter-spacing: -0.015em; }
+  .m-nm { font-size: 9px; color: #47B3B0; }
+  .m-rows { display: flex; flex-direction: column; gap: 3px; }
+  .m-rows div { background: #19201E; border-radius: 3px; padding: 5px 8px; font-size: 8px;
+    display: flex; gap: 6px; align-items: center; color: #C8D0CE; }
+  .m-rows i { width: 5px; height: 5px; border-radius: 50%; flex: none; font-style: normal; }
+  .m-rows b { font-family: var(--mono); font-weight: 400; color: #8A9895; }
+  .m-tom { font-size: 7px; color: #8A9895; padding: 0 2px; }
+  .m-gro { background: #16302E; color: #47B3B0; border-radius: 4px; text-align: center;
+    padding: 7px; font-size: 9px; font-weight: 600; }
+</style>
+
+<div class="shell">
+
+  <header class="masthead">
+    <p class="eyebrow"><span>Design Document</span><span class="sep">/</span><span>v0.7</span><span class="sep">/</span><span>22 Aug 2026</span></p>
+    <h1>Hearth</h1>
+    <p class="standfirst">A family calendar for the kitchen wall. Locked by default, lit by the sun, and built for a tablet that is slower than you remember.</p>
+    <div class="meta-row">
+      <span class="tag live">Status: for review</span>
+      <span class="tag">Android tablet</span>
+      <span class="tag">Pi Zero 2 W</span>
+      <span class="tag">NAS</span>
+      <span class="tag">Springfield</span>
+    </div>
+  </header>
+
+  <div class="body-grid">
+
+    <nav class="toc" aria-label="Contents">
+      <p class="toc-label">Contents</p>
+      <ol>
+        <li><a href="#goals">Goals</a></li>
+        <li><a href="#constraints">Constraints</a></li>
+        <li><a href="#architecture">Architecture</a></li>
+        <li><a href="#calendars">Calendars</a></li>
+        <li><a href="#access">Access model</a></li>
+        <li><a href="#views">The two views</a></li>
+        <li><a href="#photos">Photos &amp; writes</a></li>
+        <li><a href="#data">Data model</a></li>
+        <li><a href="#tablet">Tablet</a></li>
+        <li><a href="#stack">Stack</a></li>
+        <li><a href="#risks">Risks</a></li>
+        <li><a href="#phases">Build phases</a></li>
+        <li><a href="#questions">Open questions</a></li>
+      </ol>
+    </nav>
+
+    <main>
+
+      <section id="goals">
+        <h2><span class="num">01</span><span>Goals</span></h2>
+        <div class="sec-rule"></div>
+        <span class="changed">CHANGED IN v0.7 — the memory budget was written against a machine that does not exist: the Pi has <strong>463MB usable, not 512MB</strong>, and it is <strong>shared permanently with Pi-hole</strong> · every figure in §2.1 and §3.1 is re-derived from real measurements on the reflashed 64-bit board · the nightly resize moves into its own unit so its spike cannot take the display down</span>
+        <p>A Skylight-style family display for the kitchen wall. Web app — no APK — on an Android tablet (2019-era), served from a Raspberry Pi Zero 2 W on the home LAN, reading photos from a NAS on the same LAN.</p>
+        <ul>
+          <li>The household's week at a kitchen glance.</li>
+          <li><strong>Nothing visible until someone enters a PIN.</strong> The kitchen has visitors in it.</li>
+          <li>Groceries readable and writable by all three people, inside their session.</li>
+          <li>A one-tap guest mode showing an attractive screensaver and no household data.</li>
+          <li>Alex, Dana and Sam, with a visibility matrix Alex configures.</li>
+        </ul>
+        <h3>Not in v1</h3>
+        <p><strong>Writing to calendars.</strong> Events are read-only; no creating or editing from the wall. Also out: a month view, avatar photographs, anything on the NAS beyond file storage, and public internet access — this is a LAN appliance.</p>
+      </section>
+
+      <section id="constraints">
+        <h2><span class="num">02</span><span>Constraints</span></h2>
+        <div class="sec-rule"></div>
+
+        <div class="constraints">
+          <div class="cx"><span class="cxnum">C1</span><h4>463MB, shared with Pi-hole</h4><p>A Zero 2 W that also serves the household's DNS. Rules out Docker, building on the device, and any on-demand image processing.</p></div>
+          <div class="cx"><span class="cxnum">C2</span><h4>A slow 2019 tablet</h4><p>the tablet: Snapdragon 429, 2GB, 1280×800. Current Chrome, but a tight frontend budget.</p></div>
+          <div class="cx"><span class="cxnum">C3</span><h4>The NAS is a file server</h4><p>The WD EX2 has locked firmware and no supportable container story. It stores files and nothing else.</p></div>
+          <div class="cx"><span class="cxnum">C4</span><h4>AnyList has no official API</h4><p>A reverse-engineered library — and on the write path, which raises the stakes.</p></div>
+          <div class="cx"><span class="cxnum">C5</span><h4>Google expires tokens in 7 days</h4><p>Any OAuth app in "Testing" status re-prompts weekly. Unacceptable on a wall display.</p></div>
+          <div class="cx"><span class="cxnum">C6</span><h4>The kitchen is semi-public</h4><p>Visitors stand in front of this screen. Privacy is a requirement, not a preference.</p></div>
+        </div>
+
+        <h3><span class="h3num">2.1</span>The Pi has 463MB usable, and Hearth is not its only tenant</h3>
+        <p>A 1GHz quad Cortex-A53, wifi only, booting from an SD card. The board is sold as 512MB, but that is not what the OS gets, and Hearth does not get what is left. Measured on the actual device:</p>
+        <pre><code>                                              MiB
+  nominal                                     512
+  VideoCore firmware + kernel reserve         -49   → 463 total
+  Pi-hole + base system (measured, 64-bit)   -186   → ~277 for Hearth</code></pre>
+        <p><strong>The 512MB was never real.</strong> The VideoCore is the boot processor, not an optional peripheral — its firmware brings up the ARM cores and stays resident handling clock and power management, so it cannot be given zero. The floor is <code>gpu_mem=16</code>, which selects a cut-down firmware with no codecs, no 3D and a 1080p@16bpp early framebuffer — all correct for a headless board. The default of 64 costs 48MB for nothing.</p>
+        <p><strong>The Pi also runs Pi-hole</strong>, permanently and by choice. It serves DNS for the whole household, which makes it more important than the wall display: a Hearth bug that exhausts memory must not take the family's internet with it. Hence hard <code>MemoryMax=</code> caps on every Hearth unit — a cgroup ceiling turns "Hearth leaked" into "Hearth restarted" rather than "the house is offline".</p>
+        <p><strong>zram swap is mandatory</strong> — Raspberry Pi OS ships it enabled by default now (<code>/dev/zram0</code>, zstd, sized to the full 463MB of RAM), so nothing needs installing. The caps that follow are <code>MemoryMax=224M</code> with a 128MB heap for the server, and a separate <code>MemoryMax=192M</code> with a 64MB heap for the nightly resize, measured against a real Pi-hole install at ~186MB with <code>database.maxDBdays=30</code> capping its query log.</p>
+
+        <h3><span class="h3num">2.2</span>The NAS is a file server, not an app host</h3>
+        <p>The NAS is a Marvell ARM appliance with locked firmware. Docker on My Cloud OS 5 exists only as a community modification that voids the warranty and is wiped by firmware updates. Nothing custom gets installed on it.</p>
+        <div class="scroller">
+          <table class="roles">
+            <thead><tr><th>Device</th><th>Role</th></tr></thead>
+            <tbody>
+              <tr><td>NAS</td><td>Photo originals, derivative cache, nightly database backups</td></tr>
+              <tr><td>Pi Zero 2 W</td><td>Application, live database, provider sync, image processing</td></tr>
+              <tr><td>Android tablet</td><td>Display and grocery input</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <h3><span class="h3num">2.3</span>Photos live on the NAS — and that is a relief</h3>
+        <p>v0.1 planned to pull from Google Drive, because Google removed the <code>photoslibrary.readonly</code> scope on 31 March 2025 — the change that killed third-party photo frames and <code>rclone</code>'s Google Photos backend alike.</p>
+        <div class="consequence">
+          <p><strong>None of that applies any more.</strong> Photos are already on the NAS, so the app walks a directory. The library is all JPEG, so <code>sharp</code>'s prebuilt binaries handle it natively. This note survives only so that nobody later "improves" it by reconnecting Google Photos.</p>
+        </div>
+
+        <h3><span class="h3num">2.4</span>The tablet — confirmed</h3>
+        <p><strong>An Android tablet (2019-era).</strong></p>
+        <div class="scroller">
+          <table>
+            <thead><tr><th>Model</th><th>Year</th><th>Panel</th><th>SoC · RAM</th><th>Browser</th></tr></thead>
+            <tbody>
+              <tr><td class="tight">the tablet</td><td class="tight">2019</td><td class="tight"><strong>1280×800</strong> (16:10)</td><td class="tight">Snapdragon 429 · 2GB</td><td>Android 11 · <span class="chip ok">Chrome current</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>That closes the question v0.5 left open, and closes it the right way. The alternative worth worrying about was the 2015 SM-T350 — 1024×768 at 4:3, and stuck on an old Chrome build after Chrome dropped Android 7 and below, which would have invalidated both the layout and the CSS this document assumes. None of it applies to a T290.</p>
+        <div class="note">
+          <span class="kicker">Still to measure: the CSS viewport</span>
+          <p>1280×800 is the panel, not the viewport. Android reports CSS pixels at the device's density, and an 8" 1280×800 screen sits close to a bucket boundary — at DPR 1.0 the landscape viewport is 1280px wide, at 1.5 it is nearer 853px, which falls outside the fluid range below. Read <code>window.innerWidth</code> on the device before layout work starts in phase 2.</p>
+        </div>
+        <p>The budget is <strong>tighter</strong> than the A7 Lite estimate in v0.3, not looser — the Snapdragon 429 is slower than a Helio P22, and there is only 2GB of RAM:</p>
+        <div class="budget">
+          <div><span>JAVASCRIPT</span>Under ~120KB gzipped. Server-render; hydrate as little as possible.</div>
+          <div><span>GPU</span>No <code>backdrop-filter</code>, no CSS <code>blur()</code>, no large <code>box-shadow</code> on scrolling content.</div>
+          <div><span>DOM</span>Week view only. A month grid is the likeliest place this device falls over, and a week is the right span for a kitchen anyway.</div>
+          <div><span>MEMORY</span>2GB makes the nightly reload load-bearing rather than hygiene.</div>
+          <div><span>LAYOUT</span>Fluid across 1024–1340px rather than pixel-targeting one panel, until the real CSS viewport is measured.</div>
+        </div>
+
+        <h3><span class="h3num">2.5</span>AnyList is unofficial — and on the write path</h3>
+        <p><code>kevdliu/anylist</code> is reverse-engineered, needs an AnyList email and password, and can break at any time. It remains the better of the two options, with real-time <code>lists-update</code> events and quantity support that upstream lacks. Because groceries are writable, a break means someone in the kitchen cannot add milk — mitigated by the write queue in §7.1.</p>
+        <p><strong>The household list is "My Grocery List".</strong> AnyList accounts can hold several; the adapter resolves that name to a list id once at sync and stores it as the <code>external_id</code> of a <code>sources</code> row, so nothing downstream matches on a display name that someone could rename from their phone.</p>
+
+        <h3><span class="h3num">2.6</span>OAuth tokens expire in Testing mode</h3>
+        <p>Refresh tokens for an app in "Testing" publishing status expire after seven days. Set the consent screen to <strong>"In Production"</strong>. Only <strong>one</strong> grant is needed — <code>alex@example.com</code> already has everything shared into it. Todoist uses a personal API token rather than OAuth, since there is exactly one Todoist user.</p>
+      </section>
+
+      <section id="architecture">
+        <h2><span class="num">03</span><span>Architecture</span></h2>
+        <div class="sec-rule"></div>
+        <p>The tablet holds no credentials and talks to nothing but the Pi. It receives state over SSE and renders. The only things it sends back are PIN attempts, view changes, and grocery mutations.</p>
+
+        <h3><span class="h3num">3.1</span>Storage layout</h3>
+        <p>The NAS is mounted at <code>/mnt/nas</code> on the Pi.</p>
+        <pre><code>/mnt/nas/hearth/
+    pictures/       originals — the app NEVER writes here
+    cache/          derivatives, nightly — 1280×800 landscape, 640×800 portrait
+    backups/        nightly SQLite snapshots, 14 kept
+
+/var/lib/hearth/                 ← on the Pi's SD card
+    hearth.db       the live database
+    fallback/       ~30 recent derivatives for when the NAS is away</code></pre>
+        <p>The mount is read-write so <code>cache/</code> and <code>backups/</code> can be written. The read-only guarantee for originals becomes an application rule instead: nothing under <code>pictures/</code> is ever opened for writing.</p>
+
+        <div class="danger">
+          <span class="kicker">The live database must not live on the NAS</span>
+          <p>SQLite's locking depends on POSIX file locks that CIFS and NFS do not implement faithfully. Running a live database over a network mount is a well-known route to a corrupted file — and this one holds the PIN hashes and every provider's sync tokens.</p>
+          <p><code>hearth.db</code> stays on the Pi's SD card and is <em>copied</em> to the NAS nightly with <code>VACUUM INTO</code>, which produces a consistent snapshot without stopping the app. That still gives the durability that motivated putting it on the NAS: the SD card can die and the most that is lost is a day of sync tokens, which simply re-sync.</p>
+        </div>
+
+        <h3><span class="h3num">3.2</span>No public ingress</h3>
+        <p>Webhooks would need a public HTTPS endpoint and therefore <code>cloudflared</code> on a 463MB device already sharing its memory with Pi-hole. Both providers support cheap delta polling instead — Google Calendar and Todoist every five minutes via sync tokens, AnyList by push, Open-Meteo every thirty. This removes the need for any inbound connection at all.</p>
+
+        <h3><span class="h3num">3.3</span>Networking and deployment</h3>
+        <ul>
+          <li><strong>Tablet → Pi:</strong> plain HTTP over LAN, <code>http://hearth.local:8080</code>. No TLS required — see §9.</li>
+          <li><strong>Admin and OAuth → Pi:</strong> Tailscale Serve, giving real HTTPS on a <code>*.ts.net</code> hostname with no inbound firewall rules, for ~30MB of RAM.</li>
+          <li><strong>Pi → NAS:</strong> CIFS mount at <code>/mnt/nas</code>, credentials in <code>/etc/hearth/smb.cred</code> mode 0600.</li>
+        </ul>
+        <p><strong>Never build on the Pi.</strong> Build on the Mac, <code>rsync</code> the output, restart the unit. The systemd unit sets <code>Restart=always</code>, <code>MemoryMax=224M</code> and a 128MB Node heap cap — sized in §2.1, not guessed. <strong>64-bit Raspberry Pi OS is required, and the reason is <code>better-sqlite3</code>, not Node:</strong> Node 22 does ship <code>linux-armv7l</code>, but better-sqlite3 v13 bundles prebuilds for eight targets and 32-bit ARM is not one, with <code>"gypfile": false</code> so npm compiles no fallback. Only SQLite and the application live on the SD card, with <code>journal_mode=WAL</code>, batched transactions, and journald set to <code>Storage=volatile</code>.</p>
+      </section>
+
+      <section id="calendars">
+        <h2><span class="num">04</span><span>Calendars</span></h2>
+        <div class="sec-rule"></div>
+        <p>Read from the live account. Fifteen calendars, of which two must be excluded outright.</p>
+        <div class="note">
+          <span class="kicker">A seed, not a fixture</span>
+          <p>Alex configures this matrix. The settings screen in phase 3 edits the <code>visibility</code> table directly, so any of it can change without a deploy.</p>
+        </div>
+
+        <div class="people">
+          <span class="person"><span class="dot" style="background:var(--p-teal)"></span>Alex</span>
+          <span class="person"><span class="dot" style="background:var(--p-amber)"></span>Dana</span>
+          <span class="person"><span class="dot" style="background:var(--p-plum)"></span>Sam · 10 · simple view</span>
+        </div>
+
+        <div class="scroller">
+          <table class="vis">
+            <thead><tr><th>Calendar</th><th>Alex</th><th>Dana</th><th>Sam</th></tr></thead>
+            <tbody>
+              <tr><td>Alex</td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td></tr>
+              <tr><td>Dana</td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td></tr>
+              <tr><td>Sam</td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td></tr>
+              <tr><td>Family</td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td></tr>
+              <tr><td>Joint</td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td></tr>
+              <tr><td>Visitors</td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td></tr>
+              <tr><td>Other people</td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td><td class="c"><span class="no">○</span></td></tr>
+              <tr><td>Holidays in Canada</td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td></tr>
+              <tr><td>Culture calendar</td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td><td class="c"><span class="yes">●</span></td></tr>
+              <tr><td>Football <span style="color:var(--muted)">(4 feeds, collapsed)</span></td><td class="c"><span class="yes">●</span></td><td class="c"><span class="no">○</span></td><td class="c"><span class="no">○</span></td></tr>
+              <tr class="excluded"><td>Todoist</td><td class="c"><span class="ex">✕</span></td><td class="c"><span class="ex">✕</span></td><td class="c"><span class="ex">✕</span></td></tr>
+              <tr class="excluded"><td>Weather for Springfield</td><td class="c"><span class="ex">✕</span></td><td class="c"><span class="ex">✕</span></td><td class="c"><span class="ex">✕</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="font-family:var(--sans);font-size:13px;color:var(--muted)">● visible · ○ hidden by default · ✕ excluded entirely</p>
+
+        <h3><span class="h3num">4.1</span>Two deliberate exclusions</h3>
+        <p><strong>The Todoist calendar</strong> is a duplication trap — Todoist's calendar-sync writes tasks into a Google calendar, so rendering both it and the Todoist panel would show every task twice. <strong>Weather for Springfield</strong> is an ICS feed redundant with Open-Meteo. The <strong>four football feeds</strong> collapse into one "Football" row rather than competing for space on an 8" panel.</p>
+
+        <h3><span class="h3num">4.2</span>Timezone normalisation</h3>
+        <p>The account's calendars disagree about timezones: Family is <code>UTC</code>, Culture calendar is <code>America/Los_Angeles</code>, Dana's is <code>America/New_York</code>, Visitors is <code>Asia/Jerusalem</code>. Left alone, all-day events land on the wrong day.</p>
+        <ul>
+          <li>Household timezone is <strong><code>America/Toronto</code></strong>. Open-Meteo is queried at <strong>45.5, -75.5</strong>.</li>
+          <li><strong>Timed events</strong> store a UTC epoch and render in the household timezone.</li>
+          <li><strong>All-day events</strong> store a <code>YYYY-MM-DD</code> local date string, never an epoch. Treating an all-day event as midnight-UTC is the classic off-by-one-day bug.</li>
+        </ul>
+      </section>
+
+      <section id="access">
+        <h2><span class="num">05</span><span>Access model</span></h2>
+        <div class="sec-rule"></div>
+        <p>The kitchen is a semi-public room, so no household data is visible without a PIN — including the grocery list. v0.3 proposed a PIN-free groceries button; that is dropped at Alex's decision, which leaves the model with a single gate and nothing to reason around.</p>
+
+        <figure>
+          <svg viewBox="0 0 740 330" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="State machine: family screensaver taps to lock; lock leads either to a PIN-gated session or to the guest screensaver.">
+            <defs><marker id="a3" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto"><path d="M0,0 L7,3.5 L0,7 Z" fill="currentColor"/></marker></defs>
+            <g font-family="IBM Plex Mono, monospace">
+              <rect x="240" y="8" width="260" height="58" rx="5" fill="var(--accent-sf)" stroke="var(--accent)" stroke-width="1.4"/>
+              <text x="370" y="32" text-anchor="middle" fill="var(--accent)" font-size="12">SCREENSAVER · family</text>
+              <text x="370" y="50" text-anchor="middle" fill="var(--accent)" font-size="9.5">photos · clock · weather — no data</text>
+              <text x="508" y="32" fill="var(--faint)" font-size="9">◄ resting state</text>
+
+              <g stroke="var(--ink)" color="var(--ink)" stroke-width="1.3" marker-end="url(#a3)" fill="none"><path d="M370,66 L370,100"/></g>
+              <text x="380" y="88" fill="var(--muted)" font-size="9.5">tap</text>
+
+              <rect x="240" y="104" width="260" height="70" rx="5" fill="var(--surface)" stroke="var(--rule)" stroke-width="1.2"/>
+              <text x="370" y="128" text-anchor="middle" fill="var(--ink)" font-size="12">LOCK</text>
+              <g font-size="8.5" text-anchor="middle">
+                <rect x="262" y="142" width="52" height="18" rx="9" fill="none" stroke="var(--p-teal)"/><text x="288" y="155" fill="var(--p-teal)">Alex</text>
+                <rect x="320" y="142" width="52" height="18" rx="9" fill="none" stroke="var(--p-amber)"/><text x="346" y="155" fill="var(--p-amber)">Dana</text>
+                <rect x="378" y="142" width="52" height="18" rx="9" fill="none" stroke="var(--p-plum)"/><text x="404" y="155" fill="var(--p-plum)">Sam</text>
+                <rect x="436" y="142" width="46" height="18" rx="9" fill="none" stroke="var(--faint)"/><text x="459" y="155" fill="var(--muted)">Guest</text>
+              </g>
+
+              <g stroke="var(--ink)" color="var(--ink)" stroke-width="1.3" marker-end="url(#a3)" fill="none"><path d="M320,176 L320,206 L214,206 L214,232"/></g>
+              <text x="222" y="200" fill="var(--muted)" font-size="9.5">PIN</text>
+              <g stroke="var(--faint)" color="var(--faint)" stroke-width="1.3" marker-end="url(#a3)" fill="none"><path d="M460,176 L460,206 L536,206 L536,232"/></g>
+              <text x="468" y="200" fill="var(--muted)" font-size="9.5">Guest</text>
+
+              <rect x="94" y="236" width="240" height="70" rx="5" fill="var(--surface)" stroke="var(--ink)" stroke-width="1.3"/>
+              <text x="214" y="258" text-anchor="middle" fill="var(--ink)" font-size="12">SESSION · user</text>
+              <text x="214" y="275" text-anchor="middle" fill="var(--muted)" font-size="9.5">week calendar — read-only</text>
+              <text x="214" y="291" text-anchor="middle" fill="var(--accent)" font-size="9.5">groceries — read / write</text>
+
+              <rect x="416" y="236" width="240" height="70" rx="5" fill="var(--sunken)" stroke="var(--rule)" stroke-width="1.2"/>
+              <text x="536" y="264" text-anchor="middle" fill="var(--ink)" font-size="12">SCREENSAVER · guest</text>
+              <text x="536" y="282" text-anchor="middle" fill="var(--muted)" font-size="9.5">Unsplash · sticky · no data</text>
+
+              <g stroke="var(--faint)" color="var(--faint)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a3)" fill="none"><path d="M94,271 L26,271 L26,37 L236,37"/></g>
+              <text x="34" y="160" fill="var(--muted)" font-size="9.5">idle 2 min</text>
+              <g stroke="var(--faint)" color="var(--faint)" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#a3)" fill="none"><path d="M656,271 L714,271 L714,139 L504,139"/></g>
+              <text x="664" y="196" fill="var(--muted)" font-size="9.5">tap</text>
+            </g>
+          </svg>
+          <figcaption>One gate. There is no unauthenticated path to any data.</figcaption>
+        </figure>
+
+        <ul>
+          <li><strong>Resting state is the family screensaver</strong> — photos, clock, date, weather. No events, no names.</li>
+          <li><strong>Tap</strong> wakes the lock screen: three name chips and a Guest button. Names rather than photographs for now — unambiguous across three people, and one less asset pipeline in v1.</li>
+          <li><strong>Name → PIN → session</strong>, showing that person's visible calendars and the grocery list.</li>
+          <li><strong>Guest mode is sticky.</strong> It swaps to Unsplash and stays until someone enters a PIN, so family photos are not on display while visitors are over.</li>
+          <li><strong>Idle for two minutes</strong> ends the session and returns to the screensaver. Five wrong PINs triggers a 60-second lockout.</li>
+        </ul>
+
+        <div class="note">
+          <span class="kicker">Threat model, stated honestly</span>
+          <p>This stops dinner guests and visiting relatives from reading the family's schedule off the kitchen wall. It does not stop a determined attacker with physical access, and a PIN typed in a kitchen is observable. That is the right level of protection for the actual risk. PINs are argon2id-hashed regardless, because they will be reused from somewhere else.</p>
+        </div>
+      </section>
+
+      <section id="views">
+        <h2><span class="num">06</span><span>The two views</span></h2>
+        <div class="sec-rule"></div>
+        <p>One dataset, two layouts, selected by <code>view_mode</code> on the user row — <code>standard</code> or <code>simple</code>. Not a separate code path, and not a separate app.</p>
+
+        <div class="mocks">
+          <div class="mock">
+            <div class="mock-cap">STANDARD — ALEX, DANA</div>
+            <div class="screen">
+              <div class="m-top"><span class="m-user">Alex</span><span class="sp"></span><span>18° Clear</span><span class="m-clock">16:32</span></div>
+              <div class="m-week">
+                <div class="m-day"><span class="m-dl">MON</span><span class="m-dn">18</span><span class="chipx" style="background:#2E5E5D"></span></div>
+                <div class="m-day"><span class="m-dl">TUE</span><span class="m-dn">19</span><span class="chipx" style="background:#6B5230"></span><span class="chipx" style="background:#2E5E5D"></span></div>
+                <div class="m-day today"><span class="m-dl">WED</span><span class="m-dn">20</span><span class="chipx" style="background:#5C3F58"></span><span class="chipx" style="background:#2E5E5D"></span><span class="chipx" style="background:#6B5230"></span></div>
+                <div class="m-day"><span class="m-dl">THU</span><span class="m-dn">21</span><span class="chipx" style="background:#6B5230"></span></div>
+                <div class="m-day"><span class="m-dl">FRI</span><span class="m-dn">22</span><span class="chipx" style="background:#2E5E5D"></span><span class="chipx" style="background:#5C3F58"></span></div>
+                <div class="m-day"><span class="m-dl">SAT</span><span class="m-dn">23</span><span class="chipx" style="background:#5C3F58"></span></div>
+                <div class="m-day"><span class="m-dl">SUN</span><span class="m-dn">24</span></div>
+              </div>
+              <div class="m-bottom">
+                <div>Next · Dentist 17:15</div>
+                <div>Groceries · 6 items</div>
+                <div>Todoist · 3 due</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mock">
+            <div class="mock-cap">SIMPLE — SAM, YOUNG CHILD</div>
+            <div class="screen simple">
+              <div class="m-date">Wednesday<span>20 August</span></div>
+              <div class="m-next">
+                <span class="m-lab">NEXT UP</span>
+                <span class="m-nt">Soccer practice</span>
+                <span class="m-nm">16:30 · in 2 hours</span>
+              </div>
+              <div class="m-rows">
+                <div><i style="background:#B486AB"></i><b>18:00</b> Dinner</div>
+                <div><i style="background:#47B3B0"></i><b>19:30</b> Reading</div>
+              </div>
+              <div class="m-tom">Tomorrow · Swimming 17:00 · Piano 18:30</div>
+              <div class="m-gro">Groceries</div>
+            </div>
+          </div>
+        </div>
+
+        <h3><span class="h3num">6.1</span>Standard</h3>
+        <p>The week, and only the week — there is no month grid, for the performance reason in §2.4 and because a week is the right span for a kitchen. Calendars filtered by the <code>visibility</code> table, chips tinted by Google's own calendar colours. A bottom strip carries the next event, the grocery count, and — for Alex only — Todoist.</p>
+
+        <h3><span class="h3num">6.2</span>Simple</h3>
+        <p>A week grid is a scheduling tool for someone managing commitments. Sam is a young child; they want to know <strong>what they have to do and when</strong>. Top to bottom:</p>
+        <ol class="prose">
+          <li><strong>Date header.</strong> The day name set large, the date beneath. No week number, no grid.</li>
+          <li><strong>Next up.</strong> The single next event, taking roughly a third of the screen: title, time, and a relative phrase — "in 2 hours", "at 16:30", "now" — with a colour bar from the owning calendar. This is the one thing they came to the tablet for.</li>
+          <li><strong>Rest of today.</strong> Up to four more rows of <code>time · title · colour dot</code>, at least 64px tall.</li>
+          <li><strong>Tomorrow.</strong> One compressed muted line, so they know to pack a bag tonight.</li>
+          <li><strong>Groceries.</strong> Full-width button. They can add to the list like anyone else.</li>
+        </ol>
+        <p>Empty state is plain: "Nothing scheduled today." Type runs about 1.6× the standard view and touch targets are at least 56px. Their sources are their own calendar, Family, Joint, Visitors, Holidays and Culture calendar — no "Other people", no football.</p>
+
+        <h3><span class="h3num">6.3</span>The interface follows the sun</h3>
+        <p>A bright white 8" panel is a nightlight in a kitchen people walk through at night, and a dark one is hard to read in a sunlit room at noon. So the theme is not a fixed choice — it tracks sunrise and sunset.</p>
+        <ul>
+          <li><strong>Computed locally</strong> with <code>suncalc</code> from the pinned coordinates. No network call — the theme must not depend on Open-Meteo being reachable, and an astronomical calculation is deterministic and works offline.</li>
+          <li><strong>The server owns the decision.</strong> It emits <code>theme</code> in the SSE state and sets a timer for the next transition. The client stays dumb, and the behaviour is testable by feeding the calculation a date.</li>
+          <li><strong>Crossfade over about two seconds.</strong> An instant flip in a dark kitchen is unpleasant.</li>
+          <li><code>theme_mode</code> is a setting — <code>auto | light | dark</code>, default <code>auto</code>.</li>
+          <li><strong>After sunset the screensaver dims photos to roughly 80% brightness</strong>, which helps burn-in and stops the display dominating a dark room.</li>
+        </ul>
+        <p>Springfield makes this more than cosmetic, because the winter case is extreme:</p>
+        <figure>
+          <svg viewBox="0 0 720 232" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Daily timeline for Springfield comparing 21 June and 21 December: light theme between sunrise and sunset, dark otherwise, with the display off from 22:00 to 07:00.">
+            <defs>
+              <pattern id="offhatch" width="6" height="6" patternTransform="rotate(45)" patternUnits="userSpaceOnUse">
+                <rect width="6" height="6" fill="var(--sunken)"/>
+                <line x1="0" y1="0" x2="0" y2="6" stroke="var(--faint)" stroke-width="2" opacity="0.55"/>
+              </pattern>
+            </defs>
+            <g font-family="IBM Plex Mono, monospace" font-size="9.5">
+              <g fill="var(--faint)" text-anchor="middle">
+                <text x="70" y="18">00</text><text x="148.75" y="18">03</text><text x="227.5" y="18">06</text>
+                <text x="306.25" y="18">09</text><text x="385" y="18">12</text><text x="463.75" y="18">15</text>
+                <text x="542.5" y="18">18</text><text x="621.25" y="18">21</text><text x="700" y="18">24</text>
+              </g>
+              <g stroke="var(--rule)" stroke-width="1">
+                <line x1="70" y1="24" x2="70" y2="196"/><line x1="385" y1="24" x2="385" y2="196"/><line x1="700" y1="24" x2="700" y2="196"/>
+              </g>
+
+              <text x="4" y="52" fill="var(--ink)" font-size="10">21 Jun</text>
+              <rect x="70" y="36" width="133.9" height="26" fill="var(--sunken)" stroke="var(--rule)"/>
+              <rect x="203.9" y="36" width="411.7" height="26" fill="var(--accent-sf)" stroke="var(--accent)"/>
+              <rect x="615.6" y="36" width="84.4" height="26" fill="var(--sunken)" stroke="var(--rule)"/>
+              <text x="209" y="53" fill="var(--accent)" font-size="9">05:13</text>
+              <text x="611" y="53" fill="var(--accent)" font-size="9" text-anchor="end">20:54</text>
+
+              <text x="4" y="106" fill="var(--ink)" font-size="10">21 Dec</text>
+              <rect x="70" y="90" width="198.2" height="26" fill="var(--sunken)" stroke="var(--rule)"/>
+              <rect x="268.2" y="90" width="228.8" height="26" fill="var(--accent-sf)" stroke="var(--accent)"/>
+              <rect x="497" y="90" width="203" height="26" fill="var(--sunken)" stroke="var(--rule)"/>
+              <text x="273" y="107" fill="var(--accent)" font-size="9">07:39</text>
+              <text x="493" y="107" fill="var(--accent)" font-size="9" text-anchor="end">16:21</text>
+
+              <text x="4" y="160" fill="var(--ink)" font-size="10">Display</text>
+              <rect x="70" y="144" width="183.75" height="26" fill="url(#offhatch)" stroke="var(--rule)"/>
+              <rect x="253.75" y="144" width="393.75" height="26" fill="var(--surface)" stroke="var(--rule)"/>
+              <rect x="647.5" y="144" width="52.5" height="26" fill="url(#offhatch)" stroke="var(--rule)"/>
+              <text x="450" y="161" fill="var(--muted)" font-size="9" text-anchor="middle">on · 07:00 – 22:00</text>
+
+              <g font-size="9.5" fill="var(--muted)">
+                <rect x="70" y="206" width="12" height="12" fill="var(--accent-sf)" stroke="var(--accent)"/><text x="88" y="216">light theme</text>
+                <rect x="176" y="206" width="12" height="12" fill="var(--sunken)" stroke="var(--rule)"/><text x="194" y="216">dark theme</text>
+                <rect x="282" y="206" width="12" height="12" fill="url(#offhatch)" stroke="var(--rule)"/><text x="300" y="216">display off</text>
+              </g>
+            </g>
+          </svg>
+          <figcaption>Springfield, 45.5 -75.5. In December the sun sets before dinner.</figcaption>
+        </figure>
+        <p>On 21 December the sun sets at 16:21, so the display is dark-themed through the whole of dinner and the evening. On 21 June it stays light until nearly bedtime. Both are right — the point is that the panel matches the room it is in.</p>
+      </section>
+
+      <section id="photos">
+        <h2><span class="num">07</span><span>Photos and the write path</span></h2>
+        <div class="sec-rule"></div>
+        <span class="changed">CHANGED IN v0.6 — two derivative shapes, and a slide that may hold two photos</span>
+        <p>Photos live at <code>/mnt/nas/hearth/pictures/</code>. The app walks that tree and never writes to it. Nightly at 03:00, single-threaded, with <code>sharp.concurrency(1)</code> and <code>sharp.cache(false)</code>:</p>
+        <ol class="prose">
+          <li>Walk the tree; diff against the <code>photos</code> table on <code>(path, mtime, size)</code>.</li>
+          <li><strong>Apply the EXIF orientation before measuring anything</strong> (<code>sharp().rotate()</code>), then size the derivative from the rotated aspect: <strong>landscape</strong> is <code>cover</code> to <strong>1280×800</strong>, <strong>portrait</strong> is <code>inside</code> <strong>640×800</strong> with no crop. Quality 82, mozjpeg, either way. libvips shrink-on-load decodes JPEGs at 1/2, 1/4 or 1/8 scale directly, so peak memory stays around 40–60MB even for a 12MP source — which is what makes a 192MB cap at concurrency 1 survivable. <strong>The resize runs in its own systemd oneshot, not in the server process:</strong> libvips works off-heap, so its peak counts against <code>MemoryMax</code> while being invisible to <code>--max-old-space-size</code>, and split out an overrun restarts a batch job at 03:00 instead of killing the wall display.</li>
+          <li>Record <code>width</code>, <code>height</code> and <code>orientation</code>, and compute a blurhash. Measuring before the rotation is the specific bug this step exists to prevent: a phone portrait tagged orientation 6 reports landscape dimensions, so it would never be paired and would reach the panel full-bleed and on its side.</li>
+          <li>Write derivatives to <code>cache/</code> on the NAS. They are ~60KB each; serving them over LAN CIFS is instant, and the SD card stays untouched.</li>
+          <li>Keep the 30 most recently shown in <code>/var/lib/hearth/fallback/</code> so the screensaver survives the NAS being unreachable — portraits in pairs, since half a slide is not a slide.</li>
+        </ol>
+        <p>At display time the server streams a pre-sized file with a long cache header, and the tablet preloads the next slide so transitions never stutter. <strong>Nothing is resized at request time.</strong> The overlay <strong>drifts slowly around the screen</strong>, a few pixels per minute — static bright text held in one position for months causes image retention on an LCD.</p>
+
+        <p><strong>A slide is not always one photo.</strong> The panel is 1280×800 landscape and the library is mixed, so a slide is either one landscape photo full bleed, or two portraits side by side, each taking half the width:</p>
+        <pre><code>   ┌──────────────────────────┐   ┌────────────┬─────────────┐
+   │                          │   │            │             │
+   │    landscape 1280×800    │   │  portrait  │  portrait   │
+   │                          │   │   640×800  │   640×800   │
+   └──────────────────────────┘   └────────────┴─────────────┘</code></pre>
+        <p>A portrait alone on this panel is either letterboxed with two thirds of the screen empty or cropped into a strip. Pairing avoids both, and two portraits from the same afternoon read as a spread rather than an accident.</p>
+        <ul>
+          <li><strong>The server composes slides</strong>, the same way it owns the theme. SSE carries one photo or a pair; the client only cross-fades what it is handed.</li>
+          <li><strong>Pairs prefer photos taken on the same day</strong>, falling back to the next portrait in the shuffled queue.</li>
+          <li><strong>An odd portrait is held over rather than shown alone</strong> — first candidate of the next cycle, and the queue reshuffles, so nothing is starved.</li>
+          <li><strong>Each half letterboxes against its own blurred backdrop</strong>, expanded from the blurhash already on the row. Phone portraits are narrower than 4:5, so some gutter is unavoidable; nothing extra has to be generated to fill it.</li>
+          <li><strong><code>shown_count</code> and <code>last_shown</code> update for both halves</strong>, so a paired photo is not quietly favoured over a landscape one.</li>
+        </ul>
+
+        <h3><span class="h3num">7.1</span>The grocery write queue</h3>
+        <p>Because groceries are writable and AnyList is the least reliable dependency, writes never go straight through:</p>
+        <ol class="prose">
+          <li>The mutation lands in a local <code>pending_writes</code> table and applies optimistically.</li>
+          <li>A worker drains the queue against the AnyList adapter with exponential backoff.</li>
+          <li>The UI shows a small pending mark on unsynced items; nothing is lost, only delayed.</li>
+          <li>On the next <code>lists-update</code> event, server state reconciles and the mark clears.</li>
+        </ol>
+        <p>This is what makes an AnyList outage survivable rather than infuriating.</p>
+      </section>
+
+      <section id="data">
+        <h2><span class="num">08</span><span>Data model</span></h2>
+        <div class="sec-rule"></div>
+        <pre><code>CREATE TABLE users (
+  id          INTEGER PRIMARY KEY,
+  name        TEXT NOT NULL,          -- Alex | Dana | Sam
+  color       TEXT NOT NULL,
+  avatar_path TEXT,                   -- unused in v1; names are shown instead
+  pin_hash    TEXT NOT NULL,          -- argon2id
+  view_mode   TEXT NOT NULL DEFAULT 'standard',  -- standard | simple (Sam)
+  sort_order  INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE sources (
+  id            INTEGER PRIMARY KEY,
+  connection_id INTEGER NOT NULL REFERENCES connections(id) ON DELETE CASCADE,
+  kind          TEXT NOT NULL,        -- calendar | tasks | groceries
+  external_id   TEXT NOT NULL,
+  display_name  TEXT NOT NULL,
+  color         TEXT,                 -- from calendarList.backgroundColor
+  group_label   TEXT,                 -- 'Football' collapses four feeds into one row
+  sync_token    TEXT,
+  enabled       INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (connection_id, external_id)
+);
+
+CREATE TABLE visibility (
+  user_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source_id INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+  visible   INTEGER NOT NULL DEFAULT 1,
+  PRIMARY KEY (user_id, source_id)
+);
+
+CREATE TABLE events (
+  id         TEXT PRIMARY KEY,
+  source_id  INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+  title      TEXT NOT NULL,
+  starts_at  INTEGER,                 -- UTC epoch; NULL for all-day
+  ends_at    INTEGER,
+  local_date TEXT,                    -- 'YYYY-MM-DD' for all-day; NULL otherwise
+  all_day    INTEGER NOT NULL DEFAULT 0,
+  location   TEXT,
+  status     TEXT,
+  updated_at INTEGER NOT NULL
+);
+CREATE INDEX events_window ON events (starts_at, ends_at);
+CREATE INDEX events_allday ON events (local_date);
+
+-- Grocery writes are queued, never applied straight through. See §7.1.
+CREATE TABLE pending_writes (
+  id         INTEGER PRIMARY KEY,
+  source_id  INTEGER NOT NULL REFERENCES sources(id) ON DELETE CASCADE,
+  action     TEXT NOT NULL,           -- add | check | uncheck | remove
+  payload    TEXT NOT NULL,           -- json
+  attempts   INTEGER NOT NULL DEFAULT 0,
+  last_error TEXT,
+  created_at INTEGER NOT NULL
+);
+
+CREATE TABLE photos (
+  id          INTEGER PRIMARY KEY,
+  source_path TEXT NOT NULL UNIQUE,   -- under pictures/
+  mtime       INTEGER NOT NULL,
+  size        INTEGER NOT NULL,
+  cached_path TEXT NOT NULL,          -- derivative under cache/
+  width       INTEGER NOT NULL,       -- of the derivative, after EXIF rotation
+  height      INTEGER NOT NULL,
+  orientation TEXT NOT NULL,          -- 'landscape' | 'portrait'
+  blur_hash   TEXT,
+  taken_at    INTEGER,
+  shown_count INTEGER NOT NULL DEFAULT 0,
+  last_shown  INTEGER
+);
+
+CREATE INDEX photos_rotation ON photos(orientation, last_shown);</code></pre>
+        <p><code>connections</code>, <code>list_items</code> and <code>settings</code> follow the same shape; the full schema is in <code>DESIGN.md</code>. Recurring events are expanded server-side into a rolling window — one month back, twelve forward — so the tablet never evaluates an RRULE.</p>
+      </section>
+
+      <section id="tablet">
+        <h2><span class="num">09</span><span>Tablet</span></h2>
+        <div class="sec-rule"></div>
+        <p>A <strong>An Android tablet (2019-era)</strong> — 1280×800, Snapdragon 429, 2GB, Android 11 with current Chrome; see §2.4. Measure the real CSS viewport on the device before finalising layout — Android reports far fewer CSS pixels than the physical resolution, and the figure decides whether the fluid range holds. Layout targets CSS pixels and is fluid across 1024–1340px; photo derivatives target the panel's physical resolution.</p>
+
+        <h3><span class="h3num">9.1</span>Kiosk setup, at no cost</h3>
+        <p><strong>Fully Kiosk Browser, free version, with Kiosk Mode left off.</strong> The watermark people complain about appears only when Kiosk Mode — the lockdown feature — is enabled. With it off, the free version still provides launch on boot, relaunch on crash, motion detection to wake the display as someone walks into the kitchen, screen on/off schedules, and fullscreen with no browser chrome.</p>
+        <p>What is given up is hardware-button blocking and app whitelisting, which matter for a public kiosk and not for a family kitchen. Because no PWA install is needed, the app never needs a secure context — which is why plain LAN HTTP is fine.</p>
+        <p>Beyond that: a small JS bundle, and no animation beyond opacity fades.</p>
+
+        <h3><span class="h3num">9.2</span>Display schedule</h3>
+        <p><strong>Screen off at 22:00, on at 07:00</strong>, enforced by Fully Kiosk's own schedule.</p>
+        <ul>
+          <li><strong>Motion wake is suppressed during the off window.</strong> Otherwise someone getting a glass of water at 02:00 lights up the kitchen. If a night clock is wanted later, that is a different feature and a deliberate one.</li>
+          <li><strong>Fully Kiosk is authoritative for the backlight.</strong> Its remote-admin API is a Plus feature, so the app cannot drive the screen on the free tier. The same window is stored in settings as <code>quiet_hours</code> purely so the app can pause photo rotation and stop pushing SSE updates to a dark screen. The two are kept in sync by hand; it is two fields.</li>
+        </ul>
+        <p>The maintenance jobs already fall inside this window, which is convenient rather than coincidental — the photo resize runs at 03:00 and the <strong>nightly page reload at 04:00</strong>, both while nobody is looking. On a 2GB tablet that reload is load-bearing rather than hygiene, and running it behind a dark screen means nobody ever sees the flash.</p>
+      </section>
+
+      <section id="stack">
+        <h2><span class="num">10</span><span>Stack</span></h2>
+        <div class="sec-rule"></div>
+        <div class="scroller">
+          <table>
+            <thead><tr><th>Layer</th><th>Choice</th><th>Reasoning</th></tr></thead>
+            <tbody>
+              <tr><td class="tight">Runtime</td><td class="tight">Node 22 LTS arm64</td><td>The AnyList library is Node-only</td></tr>
+              <tr><td class="tight">Framework</td><td class="tight">SvelteKit</td><td>Smallest client bundle of the realistic options — and §2.4 makes that the deciding factor</td></tr>
+              <tr><td class="tight">Database</td><td class="tight">SQLite + Drizzle</td><td>One file on the Pi's SD card, never on the NAS</td></tr>
+              <tr><td class="tight">Styling</td><td class="tight">Tailwind</td><td>Purged output is tiny</td></tr>
+              <tr><td class="tight">Images</td><td class="tight">sharp / libvips</td><td>shrink-on-load keeps peak memory survivable; JPEG needs no rebuild</td></tr>
+              <tr><td class="tight">Sun times</td><td class="tight">suncalc</td><td>Local, offline, deterministic — the theme must not depend on a network call</td></tr>
+              <tr><td class="tight">Process</td><td class="tight">systemd</td><td>Docker is not affordable at this memory budget</td></tr>
+              <tr><td class="tight">Transport</td><td class="tight">SSE + POST</td><td>The tablet mostly receives; grocery mutations go back by POST</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="risks">
+        <h2><span class="num">11</span><span>Risks</span></h2>
+        <div class="sec-rule"></div>
+        <div class="scroller">
+          <table>
+            <thead><tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr></thead>
+            <tbody>
+              <tr><td>AnyList library breaks</td><td class="tight"><span class="chip crit">High</span></td><td>Groceries cannot be added</td><td>Write queue (§7.1) so nothing is lost; adapter isolation; stale badge</td></tr>
+              <tr><td>Tab A 8.0 too slow</td><td class="tight"><span class="chip warn">Medium</span></td><td>Janky UI</td><td>&lt;120KB JS, no blur, week view only, small DOM, nightly reload</td></tr>
+              <tr><td>Zero 2 W too slow</td><td class="tight"><span class="chip warn">Medium</span></td><td>Sluggish sync</td><td>Nightly image work, derivatives on the NAS; escalate to a Pi 4</td></tr>
+              <tr><td>Hearth starves Pi-hole</td><td class="tight"><span class="chip warn">Medium</span></td><td><strong>Household loses DNS</strong></td><td>Hard <code>MemoryMax=</code> on every Hearth unit; resize split out; zram</td></tr>
+              <tr><td>Pi-hole grows into Hearth's budget</td><td class="tight"><span class="chip ok">Low</span></td><td>OOM restarts</td><td><code>database.maxDBdays=30</code> caps it; re-check after a week of normal use</td></tr>
+              <tr><td>Screen burn-in</td><td class="tight"><span class="chip warn">Medium</span></td><td>Permanent artifacts</td><td>Drifting overlay, scheduled screen-off, nightly reload</td></tr>
+              <tr><td>CSS viewport narrower than 1024px</td><td class="tight"><span class="chip warn">Medium</span></td><td>Fluid range does not cover the panel</td><td>Measure <code>window.innerWidth</code> on the T290 before phase 2 layout (§2.4)</td></tr>
+              <tr><td>SD card wear-out</td><td class="tight"><span class="chip ok">Low</span></td><td>A day of sync tokens</td><td>WAL, batched writes, nightly <code>VACUUM INTO</code> to the NAS</td></tr>
+              <tr><td>OAuth refresh token loss</td><td class="tight"><span class="chip ok">Low</span></td><td>Calendars stop updating</td><td>Production publishing status; alert card on failure</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section id="phases">
+        <h2><span class="num">12</span><span>Build phases</span></h2>
+        <div class="sec-rule"></div>
+        <ol class="phases">
+          <li><div><span class="pt">Foundations</span><span class="pd">Repo, schema and migrations, systemd unit, zram, CIFS mount at <code>/mnt/nas</code>, deploy script, secret encryption, nightly backup job, health endpoint. Ends with a Pi surviving a reboot.</span></div></li>
+          <li><div><span class="pt">Calendar slice</span><span class="pd">Google OAuth in production status, calendar discovery with colours, delta sync, timezone normalisation, recurrence expansion, SSE, the standard week view. Proves the hardest plumbing end to end.</span></div></li>
+          <li><div><span class="pt">Access model and configuration</span><span class="pd">Screensaver, lock screen, PIN entry, sessions, idle timeout, guest mode, Sam's simple view — and the settings screen that edits the visibility matrix, so Alex can configure who sees what without a deploy.</span></div></li>
+          <li><div><span class="pt">Screensaver and theme</span><span class="pd">NAS walk, the two-shape resize pipeline in its own systemd oneshot + timer, slide composition with portrait pairing, cache on the NAS, local fallback ring, the drifting clock/date/weather overlay, Open-Meteo for Springfield, Unsplash for guest mode, and the sunrise/sunset theme switch. The shell from phase 2 should be built on tokens so this is a token swap, not a rewrite.</span></div></li>
+          <li><div><span class="pt">Groceries</span><span class="pd">AnyList adapter with the write queue, in-session add and check-off for all three users. The first write path in the system.</span></div></li>
+          <li><div><span class="pt">Todoist and polish</span><span class="pd">Todoist for Alex via personal token, offline handling, Fully Kiosk schedule and reload configuration, backup verification.</span></div></li>
+        </ol>
+        <p style="margin-top:20px">Phases 2 and 3 together are the first genuinely useful wall display. Phase 5 is the one the household will actually use daily.</p>
+      </section>
+
+      <section id="questions">
+        <h2><span class="num">13</span><span>Open questions</span></h2>
+        <div class="sec-rule"></div>
+        <ol class="q">
+          <li><div><strong>PIN values.</strong> Three four-digit PINs, set at first run rather than committed anywhere.</div></li>
+          <li><div><strong>The tablet's CSS viewport.</strong> Not a design question any more, just a number to read off the device — see §2.4. It decides whether the 1024–1340px fluid range holds, so read it before layout work starts in phase 2.</div></li>
+          
+        </ol>
+        <p style="margin-top:22px;font-family:var(--sans);font-size:13.5px;color:var(--muted)"><strong style="color:var(--ink)">Resolved in v0.7:</strong> the board is <strong>463MB, not 512MB</strong>, and is <strong>shared with Pi-hole permanently</strong> · <code>gpu_mem=16</code> reclaims 48MB · 64-bit is required for <code>better-sqlite3</code>, not for Node · <strong>Pi-hole's real footprint is ~186MB</strong> on the reinstalled 64-bit board with <code>database.maxDBdays=30</code>, leaving ~277MB for Hearth.<br><br><strong style="color:var(--ink)">Resolved in v0.6:</strong> the tablet turned out to be <strong>the modern 16:10 panel with current Chrome</strong> described in §2.4, so the 4:3 and old-Chrome risks are gone · the AnyList list is <strong>"My Grocery List"</strong>.<br><br><strong style="color:var(--ink)">Resolved since v0.4:</strong> theme follows sunrise/sunset via local computation · display off 22:00–07:00 with motion wake suppressed.<br><br><strong style="color:var(--ink)">Resolved since v0.3:</strong> groceries stay behind the PIN · NAS paths are <code>/mnt/nas/hearth/{pictures,cache,backups}</code> · the live database stays on the Pi · weather is 45.5, -75.5 · Todoist uses a personal token · avatars are names for now · the calendar has one view and it is the week.</p>
+      </section>
+
+      <footer>
+        <span>Hearth · design document v0.7</span>
+        <span>22 August 2026</span>
+        <span>status: for review</span>
+      </footer>
+
+    </main>
+  </div>
+</div>

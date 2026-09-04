@@ -1,0 +1,62 @@
+# Install: sudo cp deploy/hearth.service /etc/systemd/system/hearth.service
+#          sudo systemctl daemon-reload && sudo systemctl enable --now hearth
+#
+# DESIGN.md §3.3: Restart=always, MemoryMax=224M, NODE_OPTIONS=--max-old-space-size=128,
+# Node 22 LTS arm64. Never built on the Pi — scripts/deploy.sh rsyncs a Mac-built artifact.
+#
+# The caps are sized in DESIGN.md §2.1 against a measured board, not guessed: 463MB usable
+# after gpu_mem=16, shared permanently with a Pi-hole measured at ~186MB (database.maxDBdays
+# capped at 30 — that cap is load-bearing for this number), leaving ~277MB. Expected resident
+# set here is ~178MB — a 128MB heap plus roughly 50MB of V8 overhead. MemoryMax is what stops
+# a Hearth leak from taking the household's DNS down with it.
+[Unit]
+Description=Hearth family dashboard
+After=network-online.target mnt-nas.mount
+Wants=network-online.target
+# Ordering only (After=), not a hard Requires: DESIGN.md §2.5/§3.5 are explicit that a
+# missing NAS should degrade a card to a stale badge, not take the whole app down. The
+# CIFS mount unit is named after its mount point — /mnt/nas becomes mnt-nas.mount — and
+# is generated automatically from the fstab entry in deploy/fstab.snippet.
+
+[Service]
+Type=simple
+User=hearth
+Group=hearth
+WorkingDirectory=/opt/hearth/current
+EnvironmentFile=/etc/hearth/hearth.env
+Environment=NODE_OPTIONS=--max-old-space-size=128
+Environment=NODE_ENV=production
+# adapter-node does handle SIGTERM gracefully (files/index.js: closes the HTTP server,
+# waits for in-flight requests) — but its default SHUTDOWN_TIMEOUT is 30s, and the
+# screensaver/session SSE streams (/api/stream, the screensaver stream) are long-lived
+# open connections that never finish on their own. So every deploy's restart was actually
+# waiting out that 30s grace period before adapter-node force-closes them, and then
+# systemd's own default 90s TimeoutStopSec on top of that if it somehow still didn't exit
+# in time — hence the ~90s restarts noted as an open item. Cutting both bounds forces a
+# fast, deliberate force-close of any still-open SSE connection instead of a long wait for
+# something that was never going to close itself.
+Environment=SHUTDOWN_TIMEOUT=5
+
+# Applies any migrations generated since the last deploy before the server starts.
+ExecStartPre=/usr/bin/node /opt/hearth/current/scripts/migrate.mjs
+ExecStart=/usr/bin/node /opt/hearth/current/build/index.js
+
+Restart=always
+RestartSec=5
+MemoryMax=224M
+# Bounds the wait even if SHUTDOWN_TIMEOUT above somehow doesn't fire — comfortably above
+# it (5s) so the graceful path is what normally wins, well below systemd's own 90s default.
+TimeoutStopSec=15
+
+# Least privilege: the service only needs its own state dir and the NAS mount.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+# The '-' prefix makes these optional, so a missing NAS mount doesn't stop the app from
+# starting (DESIGN.md's "stale badge, not a down page" philosophy).
+ReadWritePaths=/var/lib/hearth
+ReadWritePaths=-/mnt/nas/hearth/cache
+ReadWritePaths=-/mnt/nas/hearth/backups
+
+[Install]
+WantedBy=multi-user.target

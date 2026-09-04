@@ -1,0 +1,17 @@
+# Nightly at 03:00 — inside the tablet's 22:00-07:00 quiet hours (DESIGN.md §9.2). Runs
+# first, ahead of hearth-resize.timer (03:10) and hearth-music-scan.timer (03:20) — the
+# Online Backup API (see hearth-backup.service) doesn't need a quiet database, but going
+# first keeps its I/O from competing with the heavier resize/enrichment work for no reason.
+# A small RandomizedDelaySec keeps it predictably early.
+# Install: sudo cp deploy/hearth-backup.* /etc/systemd/system/
+#          sudo systemctl daemon-reload && sudo systemctl enable --now hearth-backup.timer
+[Unit]
+Description=Run the Hearth nightly backup at 03:00
+
+[Timer]
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=30
+
+[Install]
+WantedBy=timers.target

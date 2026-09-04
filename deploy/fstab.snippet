@@ -1,0 +1,20 @@
+# Append to /etc/fstab (as root), after creating /mnt/nas and /etc/hearth/smb.cred
+# (see deploy/smb.cred.example). Replace NAS_HOST and SHARE_NAME.
+#
+#   sudo apt install cifs-utils
+#   sudo mkdir -p /mnt/nas
+#   sudo mount -a   # test it before rebooting
+#
+# DESIGN.md §3.5: read-write for cache/ and backups/ — the app enforces in code that
+# nothing under pictures/ is ever opened for writing, there is no OS-level read-only mount.
+# _netdev waits for networking; nofail keeps a boot from hanging if the NAS is off —
+# hearth.service degrades gracefully without it (see deploy/hearth.service).
+#
+# vers=2.0, not 3.0: confirmed against a real NAS — mount fails with
+# "mount error(95): Operation not supported", and `dmesg` names the actual cause:
+# "CIFS: VFS: Dialect not supported by server. Consider specifying vers=1.0 or vers=2.0".
+# The EX2's SMB stack doesn't speak 3.0. If mounting against different NAS hardware and
+# this line fails the same way, test with `sudo mount -t cifs //HOST/SHARE /mnt/nas -o
+# credentials=/etc/hearth/smb.cred,vers=X.X` for a few values before editing fstab.
+
+//NAS_HOST/SHARE_NAME /mnt/nas cifs credentials=/etc/hearth/smb.cred,uid=hearth,gid=hearth,vers=2.0,iocharset=utf8,_netdev,nofail,x-systemd.mount-timeout=30 0 0

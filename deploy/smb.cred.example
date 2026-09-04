@@ -1,0 +1,8 @@
+# Copy to /etc/hearth/smb.cred with mode 0600, owned by root, and fill in real values.
+#   sudo install -d -m 0700 /etc/hearth
+#   sudo install -m 0600 deploy/smb.cred.example /etc/hearth/smb.cred
+#   sudo nano /etc/hearth/smb.cred
+username=REPLACE_ME
+password=REPLACE_ME
+# Only needed if the My Cloud is joined to a Windows domain/workgroup other than default.
+# domain=WORKGROUP

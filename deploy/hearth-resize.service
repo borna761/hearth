@@ -1,0 +1,26 @@
+# Nightly photo resize — DESIGN.md §6. A oneshot service triggered by hearth-resize.timer;
+# not started directly. Its own systemd unit, not run in-process, because libvips works in
+# off-heap memory invisible to Node's own --max-old-space-size — an overrun here restarts
+# a batch job at 03:00 instead of taking the wall display down.
+[Unit]
+Description=Hearth nightly photo resize
+RequiresMountsFor=/mnt/nas
+
+[Service]
+Type=oneshot
+User=hearth
+Group=hearth
+EnvironmentFile=/etc/hearth/hearth.env
+ExecStart=/usr/bin/node /opt/hearth/current/scripts/resize-photos.mjs
+MemoryMax=192M
+# This Pi also serves DNS for the household (Pi-hole, DESIGN.md §2.1) and drives the wall
+# display, on one 1GHz quad Cortex-A53 — a sustained CPU-bound resize run is a plausible
+# way for the board to become unresponsive (SSH timing out, DNS stalling) purely from
+# scheduling starvation, with no OOM and no reboot involved (this is what a real manual
+# run looked like: SSH dropped mid-run, dmesg had no OOM trace, and the last progress
+# checkpoint was at 66MB RSS, nowhere near MemoryMax). CPUWeight/IOWeight cap this unit to
+# spare capacity only, the same hard-limit philosophy MemoryMax already uses above, so a
+# long resize run can never crowd out anything that actually matters on this box.
+CPUWeight=20
+IOWeight=20
+Nice=19

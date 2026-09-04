@@ -1,0 +1,1 @@
+ALTER TABLE `users` ADD `task_access` text DEFAULT 'all-but-one' NOT NULL;
