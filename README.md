@@ -100,3 +100,7 @@ All of DESIGN.md §12's planned build phases — foundations through the calenda
 screensaver/theme, groceries, and Todoist/music polish — are built and deployed to the
 real Pi. Current work is fixes and refinements rather than new phases; see DESIGN.md's
 changelog for what's actually landed recently, and `git log` for the day-to-day detail.
+
+## License
+
+[MIT](LICENSE)
