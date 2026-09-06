@@ -488,9 +488,9 @@ reconnecting Google Photos.
 | Android | 11 at its final update — **Chrome is current** |
 
 That closes the question v0.5 left open, and it closes it the right way. The alternative
-worth worrying about was an older, 2015-era 4:3 tablet: 1024×768, and stuck on an old
-Chrome build after Chrome dropped Android 7 and below, which would have invalidated both
-the layout and the CSS this document assumes. None of that applies to the actual device.
+worth worrying about was an older, 2015-era 4:3 tablet: 1024×768, and stuck on an old Chrome
+build after Chrome dropped Android 7 and below, which would have invalidated both the
+layout and the CSS this document assumes. None of that applies to the actual device.
 
 The budget is **tighter** than the A7 Lite estimate in v0.3, not looser — the Snapdragon
 429 is slower than a Helio P22 and there is only 2GB of RAM:
@@ -761,8 +761,8 @@ concern for phase 4, not a dormant one.
 
 ### 4.1 Timezone normalisation
 
-The account's calendars disagree about timezones — Family is `UTC`, the Culture calendar
-is `America/Los_Angeles`, Dana's is `America/New_York`, Visitors is `Asia/Jerusalem`.
+The account's calendars disagree about timezones — Family is `UTC`, the Culture calendar is
+`America/Los_Angeles`, Dana's is `America/New_York`, Visitors is `Asia/Jerusalem`.
 Left alone, all-day events land on the wrong day.
 
 - Household timezone is **`America/Toronto`** — Springfield's zone — stored in settings.
@@ -856,8 +856,8 @@ PIN doesn't actually apply to it the way it does to everything else.
 
 Sam is a young child. A week grid is a scheduling tool for someone managing commitments;
 a young child wants to know **what they have to do and when**. So `view_mode = 'simple'`
-on their user row selects a different layout from the same data — not a separate code
-path, not a separate app.
+on their user row selects a different layout from the same data — not a separate code path,
+not a separate app.
 
 Top to bottom:
 
@@ -1443,8 +1443,8 @@ with `database.maxDBdays=30`, leaving ~277MB for Hearth — worth another glance
 week of normal use, but no longer blocking.
 
 Resolved in v0.6: the tablet turned out to be the modern 16:10 panel with current Chrome
-described in §2.4, so the 4:3 and old-Chrome risks are gone; the AnyList list is
-**"My Grocery List"**.
+described in §2.4, so the 4:3 and old-Chrome risks are gone;
+the AnyList list is **"My Grocery List"**.
 
 Resolved since v0.3: groceries stay behind the PIN (reversed in v0.26 — §5.1); NAS paths are
 `/mnt/nas/hearth/{pictures,cache,backups}`; the live database stays on the Pi;

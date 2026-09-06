@@ -53,7 +53,7 @@ export interface AnyListGroceryList {
 	items: AnyListItem[];
 }
 
-export interface AnyListClientError extends Error {
+interface AnyListClientError extends Error {
 	name: 'AnyListClientError';
 }
 

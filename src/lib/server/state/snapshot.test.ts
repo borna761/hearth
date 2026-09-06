@@ -7,7 +7,12 @@ import { eq } from 'drizzle-orm';
 import * as schema from '../db/schema';
 import { sources, events } from '../db/schema';
 import { upsertConnection, getConnection } from '../connections';
-import { buildWeekSnapshot } from './snapshot';
+import {
+	buildWeekSnapshot,
+	bucketEventsByDay,
+	computeDisplayHours,
+	type EventRow
+} from './snapshot';
 
 let sqlite: Database.Database;
 let db: BetterSQLite3Database<typeof schema>;
@@ -351,5 +356,128 @@ describe('buildWeekSnapshot', () => {
 		const a = await buildWeekSnapshot(db, { now: NOW, timeZone: TZ });
 		const b = await buildWeekSnapshot(db, { now: NOW, timeZone: TZ });
 		expect(JSON.stringify(a)).toBe(JSON.stringify(b));
+	});
+});
+
+// Direct tests for the two functions buildWeekSnapshot delegates to — the DB-backed tests
+// above already exercise this same logic thoroughly through the public function (including
+// the past-midnight clamp and multi-day spans), so these add fast, DB-free coverage of the
+// functions' own contracts rather than closing a gap the tests above left open.
+describe('bucketEventsByDay', () => {
+	const WEEK_START = '2026-08-23';
+
+	function row(overrides: Partial<EventRow>): EventRow {
+		return {
+			id: 'e1',
+			title: 'Event',
+			startsAt: null,
+			endsAt: null,
+			allDay: false,
+			localDate: null,
+			localEndDate: null,
+			color: '#000',
+			displayName: 'My Calendar',
+			groupLabel: null,
+			...overrides
+		};
+	}
+
+	it('creates an empty array for every day in the week even with no matching rows', () => {
+		const byDate = bucketEventsByDay([], WEEK_START, TZ, '24h');
+		expect([...byDate.keys()]).toEqual([
+			'2026-08-23',
+			'2026-08-24',
+			'2026-08-25',
+			'2026-08-26',
+			'2026-08-27',
+			'2026-08-28',
+			'2026-08-29'
+		]);
+		expect([...byDate.values()].every((list) => list.length === 0)).toBe(true);
+	});
+
+	it('places a timed event on its local day with formatted time and start/end minutes', () => {
+		const byDate = bucketEventsByDay(
+			[row({ id: 'dentist', startsAt: new Date('2026-08-23T18:30:00Z') })],
+			WEEK_START,
+			TZ,
+			'24h'
+		);
+		const [event] = byDate.get('2026-08-23')!;
+		expect(event.time).toBe('14:30');
+		expect(event.startMinutes).toBe(14 * 60 + 30);
+		expect(event.endMinutes).toBe(14 * 60 + 30); // falls back to startMinutes, no endsAt
+	});
+
+	it('clamps endMinutes to end of day for an event ending on a later local day', () => {
+		const byDate = bucketEventsByDay(
+			[
+				row({
+					id: 'late-party',
+					startsAt: new Date('2026-08-23T23:00:00Z'), // 19:00 Toronto
+					endsAt: new Date('2026-08-24T05:00:00Z') // 01:00 Toronto, next local day
+				})
+			],
+			WEEK_START,
+			TZ,
+			'24h'
+		);
+		const [event] = byDate.get('2026-08-23')!;
+		expect(event.endMinutes).toBe(24 * 60 - 1);
+	});
+
+	it('repeats a multi-day all-day event on every day in [localDate, localEndDate]', () => {
+		const byDate = bucketEventsByDay(
+			[
+				row({
+					id: 'vacation',
+					allDay: true,
+					localDate: '2026-08-24',
+					localEndDate: '2026-08-26'
+				})
+			],
+			WEEK_START,
+			TZ,
+			'24h'
+		);
+		const covered = [...byDate.entries()]
+			.filter(([, events]) => events.some((e) => e.id === 'vacation'))
+			.map(([date]) => date);
+		expect(covered).toEqual(['2026-08-24', '2026-08-25', '2026-08-26']);
+	});
+
+	it('uses the group label over the calendar display name when the source is grouped', () => {
+		const byDate = bucketEventsByDay(
+			[
+				row({
+					startsAt: new Date('2026-08-23T18:00:00Z'),
+					displayName: 'NFL RedZone',
+					groupLabel: 'Football'
+				})
+			],
+			WEEK_START,
+			TZ,
+			'24h'
+		);
+		expect(byDate.get('2026-08-23')![0].calendar).toBe('Football');
+	});
+});
+
+describe('computeDisplayHours', () => {
+	it('rounds an exact-hour quiet-hours boundary trivially', () => {
+		expect(computeDisplayHours({ startMinutes: 22 * 60, endMinutes: 7 * 60 })).toEqual({
+			start: 7,
+			end: 22
+		});
+	});
+
+	// The grid can only display whole hours, so a non-exact-hour quiet-hours boundary must
+	// round outward (ceil the start, floor the end) — rounding inward would clip a partial
+	// hour the household actually configured as awake time.
+	it('rounds a non-exact-hour boundary outward to the nearest whole hour', () => {
+		expect(computeDisplayHours({ startMinutes: 22 * 60 + 45, endMinutes: 6 * 60 + 30 })).toEqual({
+			start: 7, // 6:30 -> ceil to 7
+			end: 22 // 22:45 -> floor to 22
+		});
 	});
 });

@@ -29,14 +29,42 @@ export interface HourlyForecastEntry {
 	time: string;
 	temperatureC: number;
 	icon: WeatherIcon;
+	precipitationMm: number;
+}
+
+export interface DailyForecastEntry {
+	/** 'YYYY-MM-DD', already in the household's zone. Index 0 is today. */
+	date: string;
+	highC: number;
+	lowC: number;
+	icon: WeatherIcon;
 }
 
 export interface Weather {
 	temperatureC: number;
 	condition: string;
 	icon: WeatherIcon;
+	/** Null if Open-Meteo's response omitted it — same optional-chained fallback as
+	 * sunrise/sunset below, for the full-screen weather report (not shown on the
+	 * screensaver's small overlay, which stays just temperature + condition). */
+	feelsLikeC: number | null;
+	humidityPercent: number | null;
+	precipitationMm: number | null;
+	windSpeedKmh: number | null;
+	windDirectionDeg: number | null;
+	/** Today's peak, not the current instantaneous value — Open-Meteo only offers UV index
+	 * on the daily block, not current, and "how high does it get today" is the more useful
+	 * number for planning around anyway. */
+	uvIndex: number | null;
+	/** US AQI (0-500+, EPA scale) from a second, separate Open-Meteo request — best-effort:
+	 * a failure there falls back to null rather than failing the whole weather fetch, since
+	 * it's one metric among many, not the reason this function exists. */
+	airQualityIndex: number | null;
 	/** Roughly the next 11 hours, for the screensaver's forecast strip (DESIGN.md §7.1). */
 	hourly: HourlyForecastEntry[];
+	/** Today plus the next several days, for the full-screen weather report. Empty if
+	 * Open-Meteo's response omitted the daily block. */
+	daily: DailyForecastEntry[];
 	/** 'HH:MM', already in the household's zone. Null if Open-Meteo's response omitted it. */
 	sunrise: string | null;
 	sunset: string | null;
@@ -116,10 +144,64 @@ export function weatherIconFromCode(code: number): WeatherIcon {
 	return ICON_BY_CODE[code] ?? 'cloudy';
 }
 
+// Presentational label helpers for AQI/UV/wind direction live in $lib/weatherLabels.ts,
+// not here — that file is importable from client code (WeatherPanel.svelte), which
+// SvelteKit refuses to let anything under $lib/server/* be, even a plain pure function.
+
 interface OpenMeteoResponse {
-	current: { temperature_2m: number; weather_code: number };
-	hourly: { time: string[]; temperature_2m: number[]; weather_code: number[] };
-	daily?: { sunrise: string[]; sunset: string[] };
+	current: {
+		temperature_2m: number;
+		weather_code: number;
+		apparent_temperature?: number;
+		relative_humidity_2m?: number;
+		precipitation?: number;
+		wind_speed_10m?: number;
+		wind_direction_10m?: number;
+	};
+	hourly: {
+		time: string[];
+		temperature_2m: number[];
+		weather_code: number[];
+		precipitation?: number[];
+	};
+	daily?: {
+		time?: string[];
+		sunrise: string[];
+		sunset: string[];
+		weather_code?: number[];
+		temperature_2m_max?: number[];
+		temperature_2m_min?: number[];
+		uv_index_max?: number[];
+	};
+}
+
+interface AirQualityResponse {
+	current?: { us_aqi?: number };
+}
+
+/** DESIGN.md §3.1's "no key" applies here too — same host family as the main forecast,
+ * just a separate API (Open-Meteo doesn't fold air quality into /v1/forecast). Wrapped in
+ * its own try/catch by the caller: this is one metric among several on the full-screen
+ * weather report, not worth failing the whole fetch over. */
+async function fetchAirQualityIndex(
+	fetchImpl: typeof fetch,
+	location: HouseholdLocation,
+	timeZone: string
+): Promise<number | null> {
+	const params = new URLSearchParams({
+		latitude: String(location.latitude),
+		longitude: String(location.longitude),
+		current: 'us_aqi',
+		timezone: timeZone
+	});
+	try {
+		const res = await fetchImpl(`https://air-quality-api.open-meteo.com/v1/air-quality?${params}`);
+		if (!res.ok) return null;
+		const body = (await res.json()) as AirQualityResponse;
+		return body.current?.us_aqi ?? null;
+	} catch {
+		return null;
+	}
 }
 
 export async function fetchWeather(
@@ -130,16 +212,30 @@ export async function fetchWeather(
 	const params = new URLSearchParams({
 		latitude: String(location.latitude),
 		longitude: String(location.longitude),
-		current: 'temperature_2m,weather_code',
-		hourly: 'temperature_2m,weather_code',
-		daily: 'sunrise,sunset',
+		current:
+			'temperature_2m,weather_code,apparent_temperature,relative_humidity_2m,precipitation,wind_speed_10m,wind_direction_10m',
+		hourly: 'temperature_2m,weather_code,precipitation',
+		daily: 'weather_code,temperature_2m_max,temperature_2m_min,uv_index_max,sunrise,sunset',
 		forecast_hours: '12',
-		forecast_days: '1',
+		// Today plus 8 more — enough for the full-screen weather report's multi-day strip
+		// (WeatherPanel.svelte skips today there, already covered by the "current conditions"
+		// block above it, so this is 8 future days shown) to read as a proper outlook without
+		// needing to scroll (Alex's call: the 16-day max Open-Meteo offers was "too much").
+		// The hourly/screensaver-strip fields above are unaffected, they're capped
+		// independently by forecast_hours.
+		forecast_days: '9',
 		// So `hourly.time` comes back already in household-local 'YYYY-MM-DDTHH:MM' strings,
 		// rather than UTC — matching the household's own configured timezone setting.
 		timezone: timeZone
 	});
-	const res = await fetchImpl(`https://api.open-meteo.com/v1/forecast?${params}`);
+	// Run alongside the main request, not after it — fetchAirQualityIndex depends on
+	// nothing the forecast response produces (same lat/lon/timeZone inputs) and already
+	// isolates its own failure into a null return, so there's no error-handling reason to
+	// serialize them; parallel halves the wall-clock cost of every refresh for free.
+	const [res, airQualityIndex] = await Promise.all([
+		fetchImpl(`https://api.open-meteo.com/v1/forecast?${params}`),
+		fetchAirQualityIndex(fetchImpl, location, timeZone)
+	]);
 	if (!res.ok) {
 		throw new Error(`Open-Meteo request failed: ${res.status}`);
 	}
@@ -148,13 +244,44 @@ export async function fetchWeather(
 		// 'YYYY-MM-DDTHH:MM' -> 'HH:MM'.
 		time: isoLocal.slice(11, 16),
 		temperatureC: Math.round(body.hourly.temperature_2m[i]),
-		icon: weatherIconFromCode(body.hourly.weather_code[i])
+		icon: weatherIconFromCode(body.hourly.weather_code[i]),
+		precipitationMm: body.hourly.precipitation?.[i] ?? 0
 	}));
+	// flatMap + explicit undefined checks, not the hourly loop's straight assertions above —
+	// unlike hourly (a single well-known request), a day entry missing one of these three
+	// arrays (a partial/malformed response) skips just that day rather than surfacing as
+	// "NaN°" or throwing, matching how sunrise/sunset/uvIndex already degrade per-field.
+	const daily: DailyForecastEntry[] = (body.daily?.time ?? []).flatMap((isoDate, i) => {
+		const highC = body.daily?.temperature_2m_max?.[i];
+		const lowC = body.daily?.temperature_2m_min?.[i];
+		const code = body.daily?.weather_code?.[i];
+		if (highC === undefined || lowC === undefined || code === undefined) return [];
+		return [
+			{
+				date: isoDate,
+				highC: Math.round(highC),
+				lowC: Math.round(lowC),
+				icon: weatherIconFromCode(code)
+			}
+		];
+	});
 	return {
 		temperatureC: Math.round(body.current.temperature_2m),
 		condition: weatherConditionFromCode(body.current.weather_code),
 		icon: weatherIconFromCode(body.current.weather_code),
+		feelsLikeC:
+			body.current.apparent_temperature !== undefined
+				? Math.round(body.current.apparent_temperature)
+				: null,
+		humidityPercent: body.current.relative_humidity_2m ?? null,
+		precipitationMm: body.current.precipitation ?? null,
+		windSpeedKmh:
+			body.current.wind_speed_10m !== undefined ? Math.round(body.current.wind_speed_10m) : null,
+		windDirectionDeg: body.current.wind_direction_10m ?? null,
+		uvIndex: body.daily?.uv_index_max?.[0] ?? null,
+		airQualityIndex,
 		hourly,
+		daily,
 		// Today's entry only — same 'YYYY-MM-DDTHH:MM' -> 'HH:MM' slice as hourly.time.
 		// Optional-chained: older cached responses / test fixtures may not carry `daily`.
 		sunrise: body.daily?.sunrise?.[0]?.slice(11, 16) ?? null,
@@ -192,6 +319,12 @@ export async function hydrateWeatherCache(db: Db = defaultDb): Promise<void> {
 		if (!raw) return;
 		const parsed = JSON.parse(raw) as { weather?: Weather; cachedAt?: number };
 		if (!parsed.weather || typeof parsed.cachedAt !== 'number') return;
+		// A reading persisted by a version of this code from before a field was added to
+		// Weather (e.g. `daily`, added for the multi-day forecast) would otherwise hydrate
+		// as a truthy-but-wrong-shaped object — WeatherPanel.svelte's `weather.daily.slice(1)`
+		// has no guard of its own against that, so this is the one place that has to catch
+		// it before it ever reaches a client.
+		if (!Array.isArray(parsed.weather.daily)) return;
 		cached = parsed.weather;
 		cachedAt = parsed.cachedAt;
 	} catch {

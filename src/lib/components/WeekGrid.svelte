@@ -1,11 +1,8 @@
 <script lang="ts">
 	import type { SnapshotDay } from '$lib/server/state/snapshot';
+	import { dayNumber } from '$lib/datetime';
 
 	let { days }: { days: SnapshotDay[] } = $props();
-
-	function dayNumber(date: string): string {
-		return String(Number(date.slice(8, 10)));
-	}
 </script>
 
 <div class="grid min-h-0 flex-1 grid-cols-7">

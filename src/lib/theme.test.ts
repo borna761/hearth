@@ -7,7 +7,7 @@ import { computeTheme } from './theme';
 const SUMMER_SUNRISE_EDT = '2026-06-21T09:13:00Z'; // 05:13 Springfield
 const SUMMER_SUNSET_EDT = '2026-06-22T00:54:00Z'; // 20:54 Springfield (21 Jun local)
 const WINTER_SUNRISE_EST = '2026-12-21T12:39:00Z'; // 07:39 Springfield
-const WINTER_SUNSET_EST = '2026-12-21T21:21:18.161Z'; // 16:21 Springfield — exact suncalc output, for the boundary test
+const WINTER_SUNSET_EST = '2026-12-21T21:21:18.161Z'; // 16:21 Springfield
 
 describe('computeTheme', () => {
 	it('is dark before sunrise on the summer solstice', () => {

@@ -5,8 +5,8 @@ import { setUserColor } from '$lib/server/users';
 
 const HEX_COLOR = /^#[0-9a-fA-F]{6}$/;
 
-/** DESIGN.md §7.5's "the admin configures the whole household" pattern, same shape as
- * the PIN reset — Alex can change any user's color, not just their own. */
+/** DESIGN.md §7.5's "the admin configures the whole household" pattern, same shape as the PIN
+ * reset — Alex can change any user's color, not just their own. */
 export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!locals.session?.isAdmin) {
 		return json({ ok: false }, { status: 403 });

@@ -259,6 +259,36 @@ describe('runSyncCycle — failure isolation', () => {
 		expect(result.upserted).toBe(4); // A and C still applied
 	});
 
+	it('accumulates deleted and pruned totals across every calendar, not just upserted', async () => {
+		await seed(['A', 'B']);
+		let call = 0;
+		const syncFn = vi.fn(async () => {
+			call += 1;
+			return { fullSync: false, upserted: call, deleted: call * 2, pruned: call * 3, skipped: 0 };
+		});
+
+		const result = await runSyncCycle(db, deps({ syncFn }));
+
+		expect(result.upserted).toBe(1 + 2);
+		expect(result.deleted).toBe(2 + 4);
+		expect(result.pruned).toBe(3 + 6);
+	});
+
+	it('records a non-Error throw (e.g. a plain string) as a failure instead of crashing the cycle', async () => {
+		await seed(['A', 'B']);
+		const syncFn = vi.fn(async (_db, source) => {
+			if (source.displayName === 'A') throw 'not an Error instance';
+			return { fullSync: false, upserted: 1, deleted: 0, pruned: 0, skipped: 0 };
+		});
+
+		const result = await runSyncCycle(db, deps({ syncFn }));
+
+		expect(result.failures).toHaveLength(1);
+		expect(result.failures[0].calendar).toBe('A');
+		expect(result.failures[0].error).toBe('not an Error instance');
+		expect(result.upserted).toBe(1); // B still applied
+	});
+
 	it('marks the connection healthy after a clean cycle', async () => {
 		const connectionId = await seed(['A']);
 		await runSyncCycle(db, deps());

@@ -72,6 +72,55 @@ async function shouldRunFullSync(db: Db, now: Date, timeZone: string): Promise<b
 	return localHourInZone(now, timeZone) >= FULL_SYNC_HOUR;
 }
 
+/**
+ * Syncs every enabled calendar in turn, collecting totals and per-calendar failures — pulled
+ * out of runSyncCycle so the loop's own concerns (sequencing, per-item failure isolation)
+ * are readable on their own. `options` is forwarded to `syncFn` as-is, the same object every
+ * calendar in the loop gets — grouped here rather than three separate parameters since
+ * that's the shape the callee itself expects.
+ */
+async function syncAllCalendars(
+	db: Db,
+	calendars: (typeof sources.$inferSelect)[],
+	accessToken: string,
+	syncFn: SyncFn,
+	options: {
+		window: ReturnType<typeof buildSyncWindow>;
+		forceFull: boolean;
+		fetchFn?: typeof fetch;
+	}
+): Promise<{
+	upserted: number;
+	deleted: number;
+	pruned: number;
+	failures: CycleResult['failures'];
+}> {
+	const failures: CycleResult['failures'] = [];
+	let upserted = 0;
+	let deleted = 0;
+	let pruned = 0;
+
+	// Strictly sequential. Thirteen concurrent HTTPS requests on a 463MB board shared with
+	// Pi-hole (§2.1) is not affordable, and the consequence of overcommitting there is the
+	// household losing DNS — worse than a slow calendar refresh.
+	for (const source of calendars) {
+		try {
+			const result: SyncResult = await syncFn(db, source, accessToken, options);
+			upserted += result.upserted;
+			deleted += result.deleted;
+			pruned += result.pruned;
+		} catch (err) {
+			// One bad calendar must not cost the other twelve their refresh.
+			failures.push({
+				calendar: source.displayName,
+				error: err instanceof Error ? err.message : String(err)
+			});
+		}
+	}
+
+	return { upserted, deleted, pruned, failures };
+}
+
 export async function runSyncCycle(db: Db, deps: CycleDeps): Promise<CycleResult> {
 	const syncFn = deps.syncFn ?? syncCalendar;
 	const discoverFn =
@@ -87,12 +136,7 @@ export async function runSyncCycle(db: Db, deps: CycleDeps): Promise<CycleResult
 	const forceFull = await shouldRunFullSync(db, deps.now, deps.timeZone);
 	const window = buildSyncWindow(deps.now, deps.timeZone);
 
-	const failures: CycleResult['failures'] = [];
-	let upserted = 0;
-	let deleted = 0;
-	let pruned = 0;
 	let accessToken: string;
-
 	try {
 		accessToken = await deps.getAccessToken(connection);
 	} catch (err) {
@@ -107,6 +151,8 @@ export async function runSyncCycle(db: Db, deps: CycleDeps): Promise<CycleResult
 			failures: [{ calendar: '(token)', error: message }]
 		};
 	}
+
+	const failures: CycleResult['failures'] = [];
 
 	if (forceFull) {
 		// Same cadence as the full event sync, not every five-minute incremental tick —
@@ -134,27 +180,13 @@ export async function runSyncCycle(db: Db, deps: CycleDeps): Promise<CycleResult
 			)
 		);
 
-	// Strictly sequential. Thirteen concurrent HTTPS requests on a 463MB board shared with
-	// Pi-hole (§2.1) is not affordable, and the consequence of overcommitting there is the
-	// household losing DNS — worse than a slow calendar refresh.
-	for (const source of calendars) {
-		try {
-			const result: SyncResult = await syncFn(db, source, accessToken, {
-				window,
-				forceFull,
-				fetchFn: deps.fetchFn
-			});
-			upserted += result.upserted;
-			deleted += result.deleted;
-			pruned += result.pruned;
-		} catch (err) {
-			// One bad calendar must not cost the other twelve their refresh.
-			failures.push({
-				calendar: source.displayName,
-				error: err instanceof Error ? err.message : String(err)
-			});
-		}
-	}
+	const cycleResult = await syncAllCalendars(db, calendars, accessToken, syncFn, {
+		window,
+		forceFull,
+		fetchFn: deps.fetchFn
+	});
+	const { upserted, deleted, pruned } = cycleResult;
+	failures.push(...cycleResult.failures);
 
 	if (forceFull) {
 		// Stamped even when some calendars failed. The ledger's job is "don't re-run the

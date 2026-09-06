@@ -103,3 +103,11 @@ export function weekdayAbbrev(date: string): string {
 	const anchor = new Date(Date.UTC(year, month - 1, day, 12));
 	return new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', weekday: 'short' }).format(anchor);
 }
+
+/** Day-of-month from a 'YYYY-MM-DD' string, no leading zero — "5", not "05". Pure string
+ * slicing, not a real date parse, for the same reason weekdayAbbrev is UTC-anchored: the
+ * date is already the correct calendar day, so there's nothing to risk a timezone
+ * conversion over. */
+export function dayNumber(date: string): string {
+	return String(Number(date.slice(8, 10)));
+}

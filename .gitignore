@@ -1,10 +1,36 @@
 node_modules
-.svelte-kit
-build
+
+# Output
+.output
+.vercel
+.netlify
+.wrangler
+/.svelte-kit
+/build
+
+# OS
 .DS_Store
-*.db
+Thumbs.db
+
+# Env
 .env
 .env.*
 !.env.example
 !.env.test
-.cache
+
+# Vite
+vite.config.js.timestamp-*
+vite.config.ts.timestamp-*
+
+# SQLite
+*.db
+*.db-wal
+*.db-shm
+
+# NAS-mirrored photo cache, only present in local dev
+cache/photos/
+
+# The real find/replace data for scripts/scrub-for-public.mjs — contains actual personal
+# data (names, emails, coordinates), so it must never be committed. See
+# scripts/scrub-rules.data.example.mjs for the template.
+/scripts/scrub-rules.data.mjs

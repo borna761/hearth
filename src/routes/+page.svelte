@@ -10,6 +10,7 @@
 	import GroceryPanel from '$lib/components/GroceryPanel.svelte';
 	import TasksPanel from '$lib/components/TasksPanel.svelte';
 	import MusicPanel from '$lib/components/MusicPanel.svelte';
+	import WeatherPanel from '$lib/components/WeatherPanel.svelte';
 	import { findNextEvent } from '$lib/week/nextEvent';
 	import { applyWeekViewChange, resolveWeekViewOnLogin, type ViewMode } from '$lib/week/viewMode';
 	import type { TimeFormat } from '$lib/week/format';
@@ -19,12 +20,8 @@
 	import type { GroceriesSnapshot } from '$lib/server/groceries';
 	import type { TasksSnapshot } from '$lib/server/tasks';
 	import { saveSessionCache, loadSessionCache, clearSessionCache } from '$lib/sessionCache';
-	import {
-		anyPanelOpen,
-		panelIdleTimeoutMs,
-		closePanels,
-		PANEL_IDLE_TIMEOUT_MS
-	} from '$lib/panelIdle';
+	import { panelIdleTimeoutMs, type PanelKind } from '$lib/panelIdle';
+	import { watchIdle, sendHeartbeat } from '$lib/idleTimer';
 
 	let { data }: { data: PageData } = $props();
 
@@ -111,12 +108,10 @@
 	// docs/phase-5-plan.md M4: a layer inside the session, not a stage and not a route — a
 	// real /groceries route would remount the page, tear down and reopen the EventSource,
 	// and re-run the load function, a visible stall on a Zero 2 W for something that should
-	// feel instant.
-	let groceryPanelOpen = $state(false);
-	// Same reasoning, same layer — docs/phase-6-todoist-plan.md §6.
-	let taskPanelOpen = $state(false);
-	// Same reasoning, same layer — docs/phase-7-music-plan.md.
-	let musicPanelOpen = $state(false);
+	// feel instant. One value, not one boolean per panel (grocery/task/music/weather,
+	// docs/phase-6-todoist-plan.md §6, docs/phase-7-music-plan.md) — at most one of these is
+	// ever open at once, they're all full-bleed or edge-pinned overlays that don't compose.
+	let openPanel = $state<PanelKind | null>(null);
 
 	async function toggleViewMode() {
 		const next = viewMode === 'agenda' ? 'grid' : 'agenda';
@@ -214,11 +209,13 @@
 	// data once the server notices, via the 'locked' envelope above.
 	// docs/phase-5-plan.md M4: standing at the counter reading the list while putting
 	// shopping away touches nothing, and that's the single most likely real use of the
-	// grocery panel — this is that timeout while it's open. Applies to the tasks and music
-	// panels too (docs/phase-6-todoist-plan.md §6) — reading an overdue list or a track
-	// list is the same "standing there, not tapping" case. panelIdleTimeoutMs/anyPanelOpen
-	// come from $lib/panelIdle so this logic is testable (src/lib/panelIdle.test.ts) — it
-	// was missing musicPanelOpen entirely until that panel stopped auto-closing.
+	// grocery panel — this is that timeout while it's open. Applies to the tasks, music,
+	// and weather panels too (docs/phase-6-todoist-plan.md §6) — reading an overdue list or
+	// a track list is the same "standing there, not tapping" case. panelIdleTimeoutMs comes
+	// from $lib/panelIdle so this logic is testable (src/lib/panelIdle.test.ts) — it was
+	// missing musicPanelOpen entirely until that panel stopped auto-closing. watchIdle and
+	// sendHeartbeat themselves live in $lib/idleTimer for the same testability reason
+	// (src/lib/idleTimer.test.ts).
 	const HEARTBEAT_MIN_INTERVAL_MS = 15_000;
 
 	async function endSessionAndLock() {
@@ -226,9 +223,7 @@
 		snapshot = null;
 		groceries = null;
 		tasks = null;
-		groceryPanelOpen = false;
-		taskPanelOpen = false;
-		musicPanelOpen = false;
+		openPanel = null;
 		clearSessionCache();
 		await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
 	}
@@ -236,36 +231,16 @@
 	$effect(() => {
 		if (stage !== 'session') return;
 
-		let idleTimer: ReturnType<typeof setTimeout>;
 		let lastHeartbeat = 0;
-
-		const resetIdle = () => {
-			clearTimeout(idleTimer);
-			idleTimer = setTimeout(
-				endSessionAndLock,
-				panelIdleTimeoutMs({ groceryPanelOpen, taskPanelOpen, musicPanelOpen })
-			);
-
+		const heartbeatOnActivity = () => {
 			const now = Date.now();
 			if (now - lastHeartbeat > HEARTBEAT_MIN_INTERVAL_MS) {
 				lastHeartbeat = now;
-				fetch('/api/auth/heartbeat', { method: 'POST' })
-					.then((res) => res.json())
-					.then((body: { expired?: boolean }) => {
-						if (body.expired) endSessionAndLock();
-					})
-					.catch(() => {});
+				sendHeartbeat(endSessionAndLock);
 			}
 		};
 
-		resetIdle();
-		const activityEvents = ['touchstart', 'click', 'keydown'] as const;
-		for (const eventName of activityEvents) window.addEventListener(eventName, resetIdle);
-
-		return () => {
-			clearTimeout(idleTimer);
-			for (const eventName of activityEvents) window.removeEventListener(eventName, resetIdle);
-		};
+		return watchIdle(panelIdleTimeoutMs(openPanel), endSessionAndLock, heartbeatOnActivity);
 	});
 
 	// The heartbeat above only fires on real activity (touchstart/click/keydown), so it
@@ -278,50 +253,24 @@
 	const PANEL_HEARTBEAT_INTERVAL_MS = 60_000;
 
 	$effect(() => {
-		if (stage !== 'session' || !anyPanelOpen({ groceryPanelOpen, taskPanelOpen, musicPanelOpen }))
-			return;
+		if (stage !== 'session' || openPanel === null) return;
 
-		const ping = () => {
-			fetch('/api/auth/heartbeat', { method: 'POST' })
-				.then((res) => res.json())
-				.then((body: { expired?: boolean }) => {
-					if (body.expired) endSessionAndLock();
-				})
-				.catch(() => {});
-		};
-
-		const id = setInterval(ping, PANEL_HEARTBEAT_INTERVAL_MS);
+		const id = setInterval(() => sendHeartbeat(endSessionAndLock), PANEL_HEARTBEAT_INTERVAL_MS);
 		return () => clearInterval(id);
 	});
 
 	// Guest mode opens grocery/music panels straight from the screensaver (no session to
 	// expire), so the two effects above never run for them at all — left with no timeout
 	// whatsoever, a panel opened there stayed open indefinitely until someone tapped
-	// through to the lock screen. Same panel-length allowance, just closing the panels
-	// instead of ending a session that doesn't exist in this stage.
+	// through to the lock screen. Same per-panel allowance as the session-stage effect
+	// (panelIdleTimeoutMs — music and weather both get a shorter one), just closing the
+	// panel instead of ending a session that doesn't exist in this stage.
 	$effect(() => {
-		if (
-			stage !== 'screensaver' ||
-			!anyPanelOpen({ groceryPanelOpen, taskPanelOpen, musicPanelOpen })
-		)
-			return;
+		if (stage !== 'screensaver' || openPanel === null) return;
 
-		let idleTimer: ReturnType<typeof setTimeout>;
-		const resetIdle = () => {
-			clearTimeout(idleTimer);
-			idleTimer = setTimeout(() => {
-				({ groceryPanelOpen, taskPanelOpen, musicPanelOpen } = closePanels());
-			}, PANEL_IDLE_TIMEOUT_MS);
-		};
-
-		resetIdle();
-		const activityEvents = ['touchstart', 'click', 'keydown'] as const;
-		for (const eventName of activityEvents) window.addEventListener(eventName, resetIdle);
-
-		return () => {
-			clearTimeout(idleTimer);
-			for (const eventName of activityEvents) window.removeEventListener(eventName, resetIdle);
-		};
+		return watchIdle(panelIdleTimeoutMs(openPanel), () => {
+			openPanel = null;
+		});
 	});
 
 	// --- screensaver <-> lock <-> session transitions ---
@@ -330,8 +279,7 @@
 		if (stage === 'screensaver') stage = 'lock';
 		// Tapping through to the lock screen while a panel is open (rather than closing it
 		// first) shouldn't leave it stranded open over the PIN pad.
-		groceryPanelOpen = false;
-		musicPanelOpen = false;
+		openPanel = null;
 	}
 
 	async function login(userId: number, pin: string) {
@@ -377,10 +325,12 @@
 			{groceries}
 			{musicFolders}
 			{musicSpeakers}
-			panelOpen={groceryPanelOpen || musicPanelOpen}
+			panelOpen={openPanel !== null}
 			onWake={wake}
-			onOpenGroceries={() => (groceryPanelOpen = true)}
-			onOpenMusic={() => (musicPanelOpen = true)}
+			onOpenGroceries={() => (openPanel = 'grocery')}
+			onOpenMusic={() => (openPanel = 'music')}
+			onOpenWeather={() => (openPanel = 'weather')}
+			hideOverlay={openPanel === 'weather'}
 		/>
 	{:else if stage === 'lock'}
 		<Lock
@@ -399,7 +349,7 @@
 			{timeFormat}
 			{tasks}
 			onLock={endSessionAndLock}
-			onOpenTasks={() => (taskPanelOpen = true)}
+			onOpenTasks={() => (openPanel = 'task')}
 		/>
 	{:else if snapshot}
 		<div class="flex h-full w-full flex-col">
@@ -409,7 +359,7 @@
 				{viewMode}
 				{tasks}
 				onToggleView={toggleViewMode}
-				onOpenTasks={() => (taskPanelOpen = true)}
+				onOpenTasks={() => (openPanel = 'task')}
 				onLock={endSessionAndLock}
 			/>
 			{#if viewMode === 'grid'}
@@ -431,27 +381,26 @@
 
 	<!-- Shared by both views (§5.2 item 5: Sam opens the same panel, not a variant of
 	     it) rather than duplicated per-branch above. -->
-	{#if groceryPanelOpen && groceries}
+	{#if openPanel === 'grocery' && groceries}
 		<GroceryPanel
 			{groceries}
 			large={sessionViewMode === 'simple'}
-			onClose={() => (groceryPanelOpen = false)}
+			onClose={() => (openPanel = null)}
 		/>
 	{/if}
-	{#if taskPanelOpen && tasks}
-		<TasksPanel
-			{tasks}
-			large={sessionViewMode === 'simple'}
-			onClose={() => (taskPanelOpen = false)}
-		/>
+	{#if openPanel === 'task' && tasks}
+		<TasksPanel {tasks} large={sessionViewMode === 'simple'} onClose={() => (openPanel = null)} />
 	{/if}
-	{#if musicPanelOpen && musicFolders && musicSpeakers}
+	{#if openPanel === 'music' && musicFolders && musicSpeakers}
 		<MusicPanel
 			{musicFolders}
 			{musicSpeakers}
 			large={sessionViewMode === 'simple'}
-			onClose={() => (musicPanelOpen = false)}
+			onClose={() => (openPanel = null)}
 		/>
+	{/if}
+	{#if openPanel === 'weather' && weather}
+		<WeatherPanel {weather} onClose={() => (openPanel = null)} />
 	{/if}
 
 	{#if stage === 'session' && !connected}

@@ -23,9 +23,11 @@
 		musicFolders,
 		musicSpeakers,
 		panelOpen = false,
+		hideOverlay = false,
 		onWake,
 		onOpenGroceries,
-		onOpenMusic
+		onOpenMusic,
+		onOpenWeather
 	}: {
 		timeZone: string;
 		weather: Weather | null;
@@ -35,16 +37,23 @@
 		groceries: GroceriesSnapshot | null;
 		musicFolders: MusicFolder[] | null;
 		musicSpeakers: MusicSpeaker[] | null;
-		/** True while the grocery or music sidebar is open. Both floating buttons hide in
-		 *  that case — the panel itself is translucent (not blurred, per DESIGN.md §2.4), so
-		 *  a button left visible behind it shows through as a distinct, oddly "floating"
-		 *  shape rather than the softened blob a blurred backdrop would have hidden. The
-		 *  button's whole purpose is quick access from the resting screensaver anyway; once
-		 *  a panel is open, it has nothing left to do. */
+		/** True while the grocery, music, or weather panel is open. Both floating buttons and
+		 *  the weather strip hide in that case — the panel itself is translucent/opaque, so
+		 *  a tap target left live behind it would either show through oddly or be reachable
+		 *  through nothing visible. Their whole purpose is quick access from the resting
+		 *  screensaver anyway; once a panel is open, they have nothing left to do. */
 		panelOpen?: boolean;
+		/** Narrower than panelOpen above, and deliberately generic rather than named after
+		 *  one specific panel — the parent decides which of its panels (currently just
+		 *  weather) is full-bleed/translucent over this exact clock/date/weather area and
+		 *  therefore needs it hidden underneath; this component doesn't need to know which
+		 *  panel that is, only whether to get out of the way. Grocery/music don't set this:
+		 *  they're sidebars pinned to the right edge, nowhere near the top-center clock. */
+		hideOverlay?: boolean;
 		onWake: () => void;
 		onOpenGroceries: () => void;
 		onOpenMusic: () => void;
+		onOpenWeather: () => void;
 	} = $props();
 
 	let now = $state(new Date());
@@ -189,9 +198,13 @@
 
 		<!-- Clock and guest badge drift together, DESIGN.md §7.1's "overlay drifts slowly
 	     around the screen" — both are small enough, with enough margin from the true
-	     screen edge, that a few px of wobble never exposes anything behind them. -->
-		<div class="absolute inset-0" style="transform: translate({offset.x}px, {offset.y}px)">
-			<!-- Dims the night clock itself, not an overlay on top of it — the background here is
+	     screen edge, that a few px of wobble never exposes anything behind them. Hidden
+	     entirely when hideOverlay is set (currently: the weather report is open) — that
+	     panel sits translucent over this exact spot, so leaving this lit underneath just
+	     doubled up its own current-conditions text against the report's. -->
+		{#if !hideOverlay}
+			<div class="absolute inset-0" style="transform: translate({offset.x}px, {offset.y}px)">
+				<!-- Dims the night clock itself, not an overlay on top of it — the background here is
 		     already pure black (bg-black on the root button), so there's nothing else to tint;
 		     the clock's own white text is the only thing on screen worth dimming. No scheduled
 		     screen-off/wake is configured on the tablet (§9.2, deploy/README.md §11), so this
@@ -201,40 +214,49 @@
 		     DESIGN.md §5.3 dims photos to after sunset — a solid block of white digits on pure
 		     black is a much more extreme "one bright thing on black" case than a photo, which
 		     already has its own local contrast and gets stacked tints on top. -->
-			<div
-				class="flex h-full flex-col items-center gap-2 transition-opacity duration-[2000ms] {isNightClock
-					? 'justify-center opacity-40'
-					: 'justify-start pt-[10vh]'}"
-			>
-				<p
-					class="leading-none font-light tabular-nums {isNightClock ? 'text-[13rem]' : 'text-8xl'}"
+				<div
+					class="flex h-full flex-col items-center gap-2 transition-opacity duration-[2000ms] {isNightClock
+						? 'justify-center opacity-40'
+						: 'justify-start pt-[10vh]'}"
 				>
-					{clock}
-				</p>
-				<p class="text-slate-300 {isNightClock ? 'text-3xl' : 'text-2xl'}">{dateLine}</p>
-				{#if weather}
-					<p class="flex items-center gap-2 text-xl text-slate-300">
-						<WeatherIconGlyph icon={weather.icon} class="h-6 w-6" />
-						{weather.temperatureC}° {weather.condition}
+					<p
+						class="leading-none font-light tabular-nums {isNightClock
+							? 'text-[13rem]'
+							: 'text-8xl'}"
+					>
+						{clock}
 					</p>
-					{#if weather.sunrise && weather.sunset}
-						<p class="flex items-center gap-4 text-lg text-slate-300">
-							<span class="flex items-center gap-1.5">
-								<WeatherIconGlyph icon="sunrise" class="h-5 w-5" />
-								{formatHHMM(weather.sunrise, timeFormat)}
-							</span>
-							<span class="flex items-center gap-1.5">
-								<WeatherIconGlyph icon="sunset" class="h-5 w-5" />
-								{formatHHMM(weather.sunset, timeFormat)}
-							</span>
+					<p class="text-slate-300 {isNightClock ? 'text-3xl' : 'text-2xl'}">{dateLine}</p>
+					{#if weather}
+						<p class="flex items-center gap-2 text-xl text-slate-300">
+							<WeatherIconGlyph icon={weather.icon} class="h-6 w-6" />
+							{weather.temperatureC}° {weather.condition}
 						</p>
+						{#if weather.sunrise && weather.sunset}
+							<p class="flex items-center gap-4 text-lg text-slate-300">
+								<span class="flex items-center gap-1.5">
+									<WeatherIconGlyph icon="sunrise" class="h-5 w-5" />
+									{formatHHMM(weather.sunrise, timeFormat)}
+								</span>
+								<span class="flex items-center gap-1.5">
+									<WeatherIconGlyph icon="sunset" class="h-5 w-5" />
+									{formatHHMM(weather.sunset, timeFormat)}
+								</span>
+							</p>
+						{/if}
 					{/if}
-				{/if}
+				</div>
 			</div>
-		</div>
+		{/if}
+	</button>
 
-		{#if weather && weather.hourly.length > 0}
-			<!-- §7.1's overlay carries "the current temperature and condition" — this extends
+	{#if weather && weather.hourly.length > 0 && !panelOpen}
+		<!-- Its own <button>, not nested in the wake button above (a real <button> can't
+		     nest inside another one, same reasoning as the music/grocery buttons below) —
+		     Alex's ask: tapping this strip opens a full-screen weather report instead of
+		     just waking the display.
+
+		     §7.1's overlay carries "the current temperature and condition" — this extends
 		     that into a short forecast strip, the way most weather apps show what's coming
 		     rather than only right now.
 
@@ -245,19 +267,34 @@
 		     existing full-screen tint above (20% always, another 20% stacked at night) —
 		     the same thing the clock/weather overlay up top already relies on with no
 		     backdrop of its own. -->
-			<div class="absolute inset-x-0 bottom-0 flex items-end justify-center px-10 pt-16 pb-8">
-				<div class="flex gap-10" style="transform: translate({offset.x}px, {offset.y}px)">
-					{#each weather.hourly as hour (hour.time)}
-						<div class="flex flex-col items-center gap-1 text-slate-200">
-							<p class="text-sm text-slate-400">{formatHHMM(hour.time, timeFormat)}</p>
-							<WeatherIconGlyph icon={hour.icon} class="h-7 w-7" />
-							<p class="text-lg font-medium tabular-nums">{hour.temperatureC}°</p>
-						</div>
-					{/each}
-				</div>
+		<button
+			type="button"
+			onclick={onOpenWeather}
+			aria-label="Weather details"
+			class="absolute inset-x-0 bottom-0 flex items-end justify-center px-10 pt-16 pb-8"
+		>
+			<div class="flex gap-10" style="transform: translate({offset.x}px, {offset.y}px)">
+				{#each weather.hourly as hour (hour.time)}
+					<div class="flex flex-col items-center gap-1 text-slate-200">
+						<p class="text-sm text-slate-400">{formatHHMM(hour.time, timeFormat)}</p>
+						<WeatherIconGlyph icon={hour.icon} class="h-7 w-7" />
+						<p class="text-lg font-medium tabular-nums">{hour.temperatureC}°</p>
+						<!-- Only shown for hours actually expecting some — a "0 mm" under every dry
+						     hour would just be noise the rest of the row already implies. Moved here
+						     from the full-screen report (Alex's ask) once that report dropped its
+						     own hourly breakdown in favor of the screensaver strip being the one
+						     place to see it. -->
+						{#if hour.precipitationMm > 0}
+							<p class="flex items-center gap-0.5 text-xs text-sky-300 tabular-nums">
+								<WeatherIconGlyph icon="precipitation" class="h-3 w-3" />
+								{hour.precipitationMm} mm
+							</p>
+						{/if}
+					</div>
+				{/each}
 			</div>
-		{/if}
-	</button>
+		</button>
+	{/if}
 
 	{#if musicButtonVisible && !panelOpen}
 		<!-- docs/phase-7-music-plan.md: same PIN-free-from-the-screensaver treatment as

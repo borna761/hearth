@@ -1,6 +1,9 @@
 <script lang="ts">
 	import type { WeatherIcon } from '$lib/server/weather';
 
+	export type GlyphIcon =
+		WeatherIcon | 'sunrise' | 'sunset' | 'precipitation' | 'humidity' | 'wind' | 'aqi';
+
 	// Flat, single-stroke icons — DESIGN.md §2.4 rules out backdrop-filter/blur/heavy
 	// shadows on this hardware, and these are cheap enough that a whole forecast row of
 	// them costs nothing. currentColor so the parent controls tint (dimmed after sunset,
@@ -8,7 +11,10 @@
 	let {
 		icon,
 		class: className = ''
-	}: { icon: WeatherIcon | 'sunrise' | 'sunset'; class?: string } = $props();
+	}: {
+		icon: GlyphIcon;
+		class?: string;
+	} = $props();
 </script>
 
 {#if icon === 'sun'}
@@ -97,6 +103,39 @@
 		/>
 		<path stroke-linecap="round" d="M1 13h22M4 16h16M6.5 19h11" />
 		<path stroke-linecap="round" d="M7.5 13a4.5 4.5 0 0 1 9 0z" fill="currentColor" />
+	</svg>
+{:else if icon === 'precipitation'}
+	<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class={className}>
+		<path
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			d="M12 3.5c3 4 6 7.4 6 10.6a6 6 0 1 1-12 0c0-3.2 3-6.6 6-10.6Z"
+		/>
+	</svg>
+{:else if icon === 'humidity'}
+	<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class={className}>
+		<path
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			d="M12 3.5c3 4 6 7.4 6 10.6a6 6 0 1 1-12 0c0-3.2 3-6.6 6-10.6Z"
+		/>
+		<path stroke-linecap="round" d="M9.5 14.5a2.5 2.5 0 0 0 2.5 2.5" />
+	</svg>
+{:else if icon === 'wind'}
+	<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class={className}>
+		<path
+			stroke-linecap="round"
+			d="M3 8h11a2.5 2.5 0 1 0-2.5-2.5M3 12h15a2.5 2.5 0 1 1-2.5 2.5M3 16h9a2.5 2.5 0 1 1-2.5 2.5"
+		/>
+	</svg>
+{:else if icon === 'aqi'}
+	<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class={className}>
+		<path
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			d="M4 12a8 8 0 0 1 8-8c3 0 5.5 1.5 7 3.5M20 12a8 8 0 0 1-8 8c-3 0-5.5-1.5-7-3.5"
+		/>
+		<path stroke-linecap="round" d="m16 5 3 2.5-3 2.5M8 19l-3-2.5 3-2.5" />
 	</svg>
 {:else}
 	<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" class={className}>

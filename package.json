@@ -30,7 +30,8 @@
 		"backup:verify": "node --env-file=.env scripts/verify-backup.mjs",
 		"todoist:connect": "node --env-file=.env scripts/connect-todoist.mjs",
 		"todoist:smoke": "node --env-file=.env scripts/todoist-smoke.mjs",
-		"cast:smoke": "node --env-file=.env scripts/cast-smoke.mjs"
+		"cast:smoke": "node --env-file=.env scripts/cast-smoke.mjs",
+		"scrub:public": "node scripts/scrub-for-public.mjs"
 	},
 	"devDependencies": {
 		"@eslint/js": "^10.0.1",

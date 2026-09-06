@@ -11,6 +11,7 @@ import { eq } from 'drizzle-orm';
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3';
 import type * as schema from '../db/schema';
 import { sessions, users } from '../db/schema';
+import { IDLE_TIMEOUT_MS } from '$lib/panelIdle';
 
 type Db = BetterSQLite3Database<typeof schema>;
 
@@ -18,8 +19,11 @@ export const SESSION_COOKIE = 'hearth_session';
 /** Sticky guest-mode flag (DESIGN.md §5/§7.4) — no DB row, since guest grants no data
  * access at all; it's a screensaver variant, not a session. */
 export const GUEST_COOKIE = 'hearth_guest';
-/** DESIGN.md §5: "Idle for two minutes ends the session and returns to the screensaver." */
-export const IDLE_TIMEOUT_MS = 2 * 60_000;
+/** DESIGN.md §5: "Idle for two minutes ends the session and returns to the screensaver." —
+ *  re-exported from panelIdle.ts (not redeclared) since +page.svelte's client-side idle
+ *  timer must stay under this same cutoff "for margin"; sharing the constant means the two
+ *  can't drift apart from one being edited without the other. */
+export { IDLE_TIMEOUT_MS };
 /** Not in DESIGN.md — a defensive cap independent of idle-timeout, in case something
  * keeps touching a session (e.g. a heartbeat bug) indefinitely. */
 export const SESSION_HARD_CAP_MS = 12 * 60 * 60_000;

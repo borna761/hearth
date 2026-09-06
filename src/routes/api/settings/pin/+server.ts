@@ -3,9 +3,8 @@ import type { RequestHandler } from './$types';
 import { db } from '$lib/server/db';
 import { setUserPin } from '$lib/server/auth/pin';
 
-/** DESIGN.md §7.5's PIN reset — Alex can reset any user's PIN, the same "the admin
- * configures the whole household" pattern the visibility matrix already uses (not just
- * their own). */
+/** DESIGN.md §7.5's PIN reset — Alex can reset any user's PIN, the same "the admin configures
+ * the whole household" pattern the visibility matrix already uses (not just their own). */
 export const POST: RequestHandler = async ({ request, locals }) => {
 	if (!locals.session?.isAdmin) {
 		return json({ ok: false }, { status: 403 });

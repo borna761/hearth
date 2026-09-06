@@ -1,6 +1,11 @@
 <script lang="ts">
-	import { computeElapsedSeconds, formatTrackTime } from '$lib/musicProgress';
+	import { computeElapsedSeconds } from '$lib/musicProgress';
 	import { shouldAutoOpenPlayingFolder, isPlayingSelectedFolder } from '$lib/musicPanelLogic';
+	import { panelSizes } from '$lib/panelSizes';
+	import SidebarPanel from './SidebarPanel.svelte';
+	import PanelCloseButton from './PanelCloseButton.svelte';
+	import TrackCover from './TrackCover.svelte';
+	import MusicNowPlayingFooter from './MusicNowPlayingFooter.svelte';
 
 	type MusicFolder = { id: number; displayName: string };
 	type MusicTrack = { id: number; title: string };
@@ -22,28 +27,8 @@
 
 	let sizes = $derived(
 		large
-			? {
-					width: 'w-[26rem]',
-					headerHeight: 'h-20',
-					title: 'text-2xl',
-					closeBtn: 'h-12 w-12 text-2xl',
-					backBtn: 'h-12 w-12 text-2xl',
-					emptyState: 'text-lg',
-					itemRow: 'min-h-16',
-					itemTitle: 'text-xl',
-					cover: 'h-12 w-12'
-				}
-			: {
-					width: 'w-96',
-					headerHeight: 'h-16',
-					title: 'text-lg',
-					closeBtn: 'h-10 w-10 text-xl',
-					backBtn: 'h-10 w-10 text-xl',
-					emptyState: 'text-base',
-					itemRow: 'min-h-14',
-					itemTitle: 'text-base',
-					cover: 'h-10 w-10'
-				}
+			? { ...panelSizes(true), backBtn: 'h-12 w-12 text-2xl', cover: 'h-12 w-12' }
+			: { ...panelSizes(false), backBtn: 'h-10 w-10 text-xl', cover: 'h-10 w-10' }
 	);
 
 	// Three-step flow: pick a playlist/folder, then a song (or shuffle all), then a
@@ -62,9 +47,12 @@
 	// Transport controls reflect the server's own in-memory session (§ playbackSession.ts)
 	// rather than anything this panel remembers locally — that way reopening the panel
 	// after closing it, or after someone else started playback, still shows the right
-	// state. No periodic polling for now: fetched once on open and after every action this
-	// panel itself takes; a pause/skip made from outside Hearth (e.g. the Google Home app
-	// directly) won't be reflected until the panel is reopened.
+	// state. Also polled periodically while playback is active (see the STATUS_POLL_MS
+	// effect below) — the device auto-advancing to the next queued track, or a pause/skip
+	// made from outside Hearth (e.g. the Google Home app directly), are both changes this
+	// panel didn't cause itself, so it can't just refresh after "every action this panel
+	// takes"; without the poll, the footer kept showing the track that was playing when the
+	// panel was opened until someone closed and reopened it.
 	let playbackActive = $state(false);
 	let playerState = $state<'IDLE' | 'BUFFERING' | 'PLAYING' | 'PAUSED'>('IDLE');
 	let playingFolderId = $state<number | null>(null);
@@ -157,6 +145,17 @@
 		const interval = setInterval(() => {
 			now = Date.now();
 		}, 250);
+		return () => clearInterval(interval);
+	});
+
+	// Separate from the 250ms ticker above (which only interpolates the progress bar
+	// between real syncs) — this actually re-fetches from the server, at a coarser
+	// interval, since /api/music/status is a plain in-memory read (no network round-trip
+	// to the speaker itself) and doesn't need sub-second freshness.
+	const STATUS_POLL_MS = 5000;
+	$effect(() => {
+		if (!playbackActive) return;
+		const interval = setInterval(refreshStatus, STATUS_POLL_MS);
 		return () => clearInterval(interval);
 	});
 
@@ -297,53 +296,11 @@
 	);
 </script>
 
-<!-- Shared by the song list rows and the now-playing footer — a placeholder note icon
-     always sits underneath, and the real cover (if any) covers it once loaded; a failed
-     or missing cover just leaves the placeholder showing, no separate empty state needed.
-     trackId null (nothing resolved yet) skips the <img> entirely rather than pointing it
-     at a nonsensical URL. -->
-{#snippet trackCover(trackId: number | null, sizeClass: string)}
-	<span
-		class="relative {sizeClass} shrink-0 overflow-hidden rounded bg-slate-200 dark:bg-slate-700"
-	>
-		<svg
-			viewBox="0 0 24 24"
-			class="absolute inset-0 h-full w-full p-2.5 text-slate-400 dark:text-slate-500"
-		>
-			<path
-				d="M9 18V5l11-2v13"
-				fill="none"
-				stroke="currentColor"
-				stroke-width="1.8"
-				stroke-linecap="round"
-				stroke-linejoin="round"
-			/>
-			<circle cx="6" cy="18" r="3" fill="currentColor" />
-			<circle cx="17" cy="16" r="3" fill="currentColor" />
-		</svg>
-		{#if trackId !== null}
-			<img
-				src="/api/music/tracks/{trackId}/cover"
-				alt=""
-				loading="lazy"
-				class="absolute inset-0 h-full w-full object-cover"
-				onerror={(e) => {
-					(e.currentTarget as HTMLImageElement).style.display = 'none';
-				}}
-			/>
-		{/if}
-	</span>
-{/snippet}
-
-<!-- Same invisible tap-to-close scrim + right-edge sidebar chrome as GroceryPanel. -->
-<button type="button" onclick={onClose} aria-label="Close music" class="absolute inset-0 z-10"
-></button>
-
-<!-- Translucent (bg-white/70), not blurred — DESIGN.md §2.4 rules out backdrop-filter/blur
-     on this hardware, same reasoning Screensaver.svelte's own overlay already follows. -->
-<div
-	class="absolute inset-y-0 right-0 z-20 flex {sizes.width} flex-col border-l border-slate-200 bg-white/70 shadow-xl dark:border-slate-700 dark:bg-slate-900/70"
->
+<SidebarPanel {onClose} closeLabel="Close music" width={sizes.width}>
+	<!-- Not PanelHeader (unlike GroceryPanel/TasksPanel) — this header needs a conditional
+	     back button and a title that changes with `view`, neither of which PanelHeader
+	     supports, and it has no subtitle/stale badge to show. Only the close button itself
+	     (PanelCloseButton) is shared with PanelHeader's version. -->
 	<header
 		class="flex {sizes.headerHeight} shrink-0 items-center gap-2 border-b border-slate-200 px-4 dark:border-slate-700"
 	>
@@ -369,14 +326,7 @@
 				on…
 			{/if}
 		</h1>
-		<button
-			type="button"
-			onclick={onClose}
-			aria-label="Done"
-			class="flex {sizes.closeBtn} items-center justify-center rounded-full text-slate-500 active:bg-slate-100 dark:text-slate-400 dark:active:bg-slate-800"
-		>
-			✕
-		</button>
+		<PanelCloseButton {onClose} sizeClass={sizes.closeBtn} />
 	</header>
 
 	{#if error}
@@ -439,7 +389,7 @@
 								disabled={starting}
 								class="flex {sizes.itemRow} w-full items-center gap-3 border-b border-slate-100 text-left disabled:opacity-50 dark:border-slate-800"
 							>
-								{@render trackCover(song.id, sizes.cover)}
+								<TrackCover trackId={song.id} class={sizes.cover} />
 								<span class="flex-1 truncate {sizes.itemTitle} text-slate-900 dark:text-slate-100">
 									{song.title}
 								</span>
@@ -473,134 +423,22 @@
 	</div>
 
 	{#if playbackActive}
-		<footer
-			class="flex shrink-0 flex-col items-center gap-2 border-t border-slate-200 px-4 py-3 dark:border-slate-700"
-		>
-			<div class="flex w-full items-center gap-3">
-				{@render trackCover(playingTrackId, sizes.cover)}
-				<div class="min-w-0 flex-1 text-left">
-					<p class="truncate text-sm font-medium text-slate-900 dark:text-slate-100">
-						{trackTitle ?? playingFolderName ?? 'Playing'}
-					</p>
-					{#if trackTitle && playingFolderName}
-						<p class="truncate text-xs text-slate-500 dark:text-slate-400">
-							{playingFolderName}
-						</p>
-					{/if}
-				</div>
-			</div>
-
-			{#if duration}
-				<div class="flex w-full items-center gap-2">
-					<span
-						class="w-9 shrink-0 text-right text-[11px] text-slate-500 tabular-nums dark:text-slate-400"
-					>
-						{formatTrackTime(elapsedSeconds)}
-					</span>
-					<div class="h-1 flex-1 overflow-hidden rounded-full bg-slate-300 dark:bg-slate-700">
-						<div
-							class="h-full rounded-full bg-slate-900 dark:bg-slate-100"
-							style="width: {progressPercent}%"
-						></div>
-					</div>
-					<span class="w-9 shrink-0 text-[11px] text-slate-500 tabular-nums dark:text-slate-400">
-						{formatTrackTime(duration)}
-					</span>
-				</div>
-			{/if}
-			<!-- Same hand-drawn-icon reasoning as Screensaver.svelte's buttons: the emoji
-			     equivalents (⏸/▶/⏭) render inconsistently across platforms — some render as
-			     plain glyphs, some (⏭ especially, on macOS) as full-color emoji with their own
-			     background chip, which is what made these look mismatched in the first place.
-			     Solid-fill currentColor shapes guarantee both buttons render identically. -->
-			<div class="flex items-center justify-center gap-3">
-				<button
-					type="button"
-					onclick={previous}
-					disabled={controlBusy}
-					aria-label="Previous"
-					class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-200 text-slate-700 active:bg-slate-300 disabled:opacity-50 dark:bg-slate-800 dark:text-slate-200 dark:active:bg-slate-700"
-				>
-					<svg viewBox="0 0 24 24" class="h-5 w-5">
-						<rect x="4.7" y="5" width="2.3" height="14" rx="1" fill="currentColor" />
-						<path
-							d="M18.5 5.6v12.8a1 1 0 0 1-1.5.87l-9.5-6.4a1 1 0 0 1 0-1.74l9.5-6.4a1 1 0 0 1 1.5.87z"
-							fill="currentColor"
-						/>
-					</svg>
-				</button>
-				<button
-					type="button"
-					onclick={toggle}
-					disabled={controlBusy}
-					aria-label={playerState === 'PLAYING' ? 'Pause' : 'Play'}
-					class="flex h-14 w-14 items-center justify-center rounded-full bg-slate-900 text-white active:bg-slate-700 disabled:opacity-50 dark:bg-slate-100 dark:text-slate-900 dark:active:bg-slate-300"
-				>
-					{#if playerState === 'PLAYING'}
-						<svg viewBox="0 0 24 24" class="h-6 w-6">
-							<rect x="6.5" y="5" width="4" height="14" rx="1" fill="currentColor" />
-							<rect x="13.5" y="5" width="4" height="14" rx="1" fill="currentColor" />
-						</svg>
-					{:else}
-						<svg viewBox="0 0 24 24" class="h-6 w-6">
-							<path
-								d="M7.5 5.2v13.6a1 1 0 0 0 1.53.85l10.9-6.8a1 1 0 0 0 0-1.7L9.03 4.35A1 1 0 0 0 7.5 5.2z"
-								fill="currentColor"
-							/>
-						</svg>
-					{/if}
-				</button>
-				<button
-					type="button"
-					onclick={next}
-					disabled={controlBusy}
-					aria-label="Next"
-					class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-200 text-slate-700 active:bg-slate-300 disabled:opacity-50 dark:bg-slate-800 dark:text-slate-200 dark:active:bg-slate-700"
-				>
-					<svg viewBox="0 0 24 24" class="h-5 w-5">
-						<path
-							d="M5.5 5.6v12.8a1 1 0 0 0 1.5.87l9.5-6.4a1 1 0 0 0 0-1.74l-9.5-6.4a1 1 0 0 0-1.5.87z"
-							fill="currentColor"
-						/>
-						<rect x="17" y="5" width="2.3" height="14" rx="1" fill="currentColor" />
-					</svg>
-				</button>
-				<button
-					type="button"
-					onclick={stop}
-					disabled={controlBusy}
-					aria-label="Stop"
-					class="flex h-11 w-11 items-center justify-center rounded-full bg-slate-200 text-slate-700 active:bg-slate-300 disabled:opacity-50 dark:bg-slate-800 dark:text-slate-200 dark:active:bg-slate-700"
-				>
-					<svg viewBox="0 0 24 24" class="h-5 w-5">
-						<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
-					</svg>
-				</button>
-			</div>
-
-			{#if volume !== null}
-				<div class="flex w-full items-center gap-2 px-1">
-					<svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0 text-slate-500 dark:text-slate-400">
-						<path d="M4 9v6h4l5 4V5L8 9H4z" fill="currentColor" />
-						<path
-							d="M16.5 8.5a5 5 0 0 1 0 7"
-							stroke="currentColor"
-							stroke-width="1.8"
-							stroke-linecap="round"
-							fill="none"
-						/>
-					</svg>
-					<input
-						type="range"
-						min="0"
-						max="100"
-						value={Math.round(volume * 100)}
-						oninput={onVolumeInput}
-						aria-label="Volume"
-						class="h-1.5 flex-1 accent-slate-900 dark:accent-slate-100"
-					/>
-				</div>
-			{/if}
-		</footer>
+		<MusicNowPlayingFooter
+			trackId={playingTrackId}
+			{trackTitle}
+			folderName={playingFolderName}
+			{playerState}
+			{elapsedSeconds}
+			{duration}
+			{volume}
+			{controlBusy}
+			coverSize={sizes.cover}
+			{progressPercent}
+			{toggle}
+			{next}
+			{previous}
+			{stop}
+			{onVolumeInput}
+		/>
 	{/if}
-</div>
+</SidebarPanel>

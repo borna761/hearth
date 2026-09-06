@@ -4,7 +4,8 @@ import {
 	localDateInZone,
 	localHourInZone,
 	localMinutesInZone,
-	weekdayAbbrev
+	weekdayAbbrev,
+	dayNumber
 } from './datetime';
 
 describe('addDaysToLocalDate', () => {
@@ -119,5 +120,13 @@ describe('weekdayAbbrev', () => {
 		// Same UTC-anchoring as addDaysToLocalDate — the date string is already the correct
 		// calendar day, so naming its weekday must not risk a real timezone conversion.
 		expect(weekdayAbbrev('2026-12-31')).toBe('Thu');
+	});
+});
+
+describe('dayNumber', () => {
+	it('extracts the day-of-month, without a leading zero', () => {
+		expect(dayNumber('2026-08-05')).toBe('5');
+		expect(dayNumber('2026-08-19')).toBe('19');
+		expect(dayNumber('2026-12-31')).toBe('31');
 	});
 });

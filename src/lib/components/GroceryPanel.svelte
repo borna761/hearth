@@ -1,5 +1,9 @@
 <script lang="ts">
 	import type { GroceriesSnapshot, GroceriesItemSnapshot } from '$lib/server/groceries';
+	import { panelSizes } from '$lib/panelSizes';
+	import SidebarPanel from './SidebarPanel.svelte';
+	import PanelHeader from './PanelHeader.svelte';
+	import PendingDot from './PendingDot.svelte';
 
 	let {
 		groceries,
@@ -18,45 +22,33 @@
 	let sizes = $derived(
 		large
 			? {
-					width: 'w-[26rem]',
-					headerHeight: 'h-20',
-					title: 'text-2xl',
+					...panelSizes(true),
 					subtitle: 'text-sm',
 					stale: 'px-2.5 py-1 text-sm',
-					closeBtn: 'h-12 w-12 text-2xl',
 					formPad: 'p-4',
 					input: 'h-14 px-4 text-lg',
 					addBtn: 'h-14 px-6 text-lg',
 					suggestionRow: 'h-14 text-lg',
 					suggestionTag: 'text-sm',
-					emptyState: 'text-lg',
 					categoryLabel: 'text-sm',
 					categoryIcon: 'text-base',
 					checkbox: 'h-8 w-8',
 					pendingDot: 'h-2.5 w-2.5',
-					itemRow: 'min-h-16',
-					itemTitle: 'text-xl',
 					quantity: 'text-base'
 				}
 			: {
-					width: 'w-96',
-					headerHeight: 'h-16',
-					title: 'text-lg',
+					...panelSizes(false),
 					subtitle: 'text-xs',
 					stale: 'px-2 py-0.5 text-xs',
-					closeBtn: 'h-10 w-10 text-xl',
 					formPad: 'p-3',
 					input: 'h-11 px-3 text-base',
 					addBtn: 'h-11 px-5 text-base',
 					suggestionRow: 'h-11 text-base',
 					suggestionTag: 'text-xs',
-					emptyState: 'text-base',
 					categoryLabel: 'text-xs',
 					categoryIcon: 'text-sm',
 					checkbox: 'h-6 w-6',
 					pendingDot: 'h-2 w-2',
-					itemRow: 'min-h-14',
-					itemTitle: 'text-base',
 					quantity: 'text-sm'
 				}
 	);
@@ -195,47 +187,14 @@
 	}
 </script>
 
-<!-- Invisible tap-to-close target for everything outside the sidebar. No dimming — the
-     whole point of the sidebar over the old full-bleed layout was to keep the dashboard
-     visible, and a scrim would fight that. Sits below the sidebar in stacking order so a
-     tap on the sidebar itself never reaches it. -->
-<button type="button" onclick={onClose} aria-label="Close groceries" class="absolute inset-0 z-10"
-></button>
-
-<!-- Sidebar over the right edge of the grid, not full-bleed — the rest of the dashboard
-     (calendar, weather) stays visible and reachable while checking items off. Translucent
-     (bg-white/70), not blurred — DESIGN.md §2.4 rules out backdrop-filter/blur on this
-     hardware, same reasoning Screensaver.svelte's own overlay already follows. -->
-<div
-	class="absolute inset-y-0 right-0 z-20 flex {sizes.width} flex-col border-l border-slate-200 bg-white/70 shadow-xl dark:border-slate-700 dark:bg-slate-900/70"
->
-	<header
-		class="flex {sizes.headerHeight} shrink-0 items-center justify-between border-b border-slate-200 px-4 dark:border-slate-700"
-	>
-		<div class="flex items-baseline gap-2.5">
-			<h1 class="{sizes.title} font-semibold text-slate-900 dark:text-slate-100">Groceries</h1>
-			<p class="{sizes.subtitle} text-slate-500 dark:text-slate-400">
-				{unchecked.length} to get
-			</p>
-			{#if groceries.stale}
-				<!-- DESIGN.md §2.5: "an outage degrades one card to a stale badge, never the
-				     page" — this is that badge, scoped to the one card that's actually affected. -->
-				<span
-					class="rounded bg-amber-100 {sizes.stale} font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-				>
-					Can't reach AnyList right now
-				</span>
-			{/if}
-		</div>
-		<button
-			type="button"
-			onclick={onClose}
-			aria-label="Done"
-			class="flex {sizes.closeBtn} items-center justify-center rounded-full text-slate-500 active:bg-slate-100 dark:text-slate-400 dark:active:bg-slate-800"
-		>
-			✕
-		</button>
-	</header>
+<SidebarPanel {onClose} closeLabel="Close groceries" width={sizes.width}>
+	<PanelHeader
+		title="Groceries"
+		subtitle="{unchecked.length} to get"
+		staleMessage={groceries.stale ? "Can't reach AnyList right now" : null}
+		{onClose}
+		{sizes}
+	/>
 
 	<!-- Pinned at the top, not the bottom: bottom placement lands exactly where the
 	     on-screen keyboard appears, and whether it stays visible depends on whether the
@@ -326,15 +285,10 @@
 									class="{sizes.checkbox} shrink-0 rounded-md border-2 border-slate-300 dark:border-slate-600"
 								></span>
 								{#if item.pending}
-									<!-- §6.1 point 3: a small pending mark on unsynced items; nothing is
-									     ever lost, only delayed, and this is the visible reminder of that.
-									     Leading, right after the checkbox — not trailing past the title's
+									<!-- Leading, right after the checkbox — not trailing past the title's
 									     flex-1 spacer, where it would sit at the row's far edge and read as
 									     belonging to whatever's in the adjacent column instead. -->
-									<span
-										class="{sizes.pendingDot} shrink-0 rounded-full bg-amber-400"
-										aria-label="Not yet synced"
-									></span>
+									<PendingDot class={sizes.pendingDot} />
 								{/if}
 								<span class="flex-1 truncate {sizes.itemTitle} text-slate-900 dark:text-slate-100">
 									{item.title}
@@ -351,4 +305,4 @@
 			{/each}
 		{/if}
 	</div>
-</div>
+</SidebarPanel>

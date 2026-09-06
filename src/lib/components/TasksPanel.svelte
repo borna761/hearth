@@ -1,6 +1,10 @@
 <script lang="ts">
 	import type { TasksSnapshot, TaskItem } from '$lib/server/tasks';
 	import { formatMonthDay } from '$lib/week/format';
+	import { panelSizes } from '$lib/panelSizes';
+	import SidebarPanel from './SidebarPanel.svelte';
+	import PanelHeader from './PanelHeader.svelte';
+	import PendingDot from './PendingDot.svelte';
 
 	let {
 		tasks,
@@ -17,31 +21,19 @@
 	let sizes = $derived(
 		large
 			? {
-					width: 'w-[26rem]',
-					headerHeight: 'h-20',
-					title: 'text-2xl',
+					...panelSizes(true),
 					subtitle: 'text-sm',
 					stale: 'px-2.5 py-1 text-sm',
-					closeBtn: 'h-12 w-12 text-2xl',
 					sectionLabel: 'text-sm',
-					emptyState: 'text-lg',
-					itemRow: 'min-h-16',
-					itemTitle: 'text-xl',
 					itemMeta: 'text-base',
 					checkbox: 'h-8 w-8',
 					pendingDot: 'h-2.5 w-2.5'
 				}
 			: {
-					width: 'w-96',
-					headerHeight: 'h-16',
-					title: 'text-lg',
+					...panelSizes(false),
 					subtitle: 'text-xs',
 					stale: 'px-2 py-0.5 text-xs',
-					closeBtn: 'h-10 w-10 text-xl',
 					sectionLabel: 'text-xs',
-					emptyState: 'text-base',
-					itemRow: 'min-h-14',
-					itemTitle: 'text-base',
 					itemMeta: 'text-sm',
 					checkbox: 'h-6 w-6',
 					pendingDot: 'h-2 w-2'
@@ -84,12 +76,7 @@
 				class="{sizes.checkbox} shrink-0 rounded-md border-2 border-slate-300 dark:border-slate-600"
 			></span>
 			{#if task.pending}
-				<!-- Same amber pending mark GroceryPanel shows on an unsynced item — nothing
-				     is ever lost, only delayed, and this is the visible reminder of that. -->
-				<span
-					class="{sizes.pendingDot} shrink-0 rounded-full bg-amber-400"
-					aria-label="Not yet synced"
-				></span>
+				<PendingDot class={sizes.pendingDot} />
 			{/if}
 			<span class="flex-1 truncate {sizes.itemTitle} text-slate-900 dark:text-slate-100">
 				{task.title}
@@ -103,43 +90,14 @@
 	</li>
 {/snippet}
 
-<!-- Invisible tap-to-close target for everything outside the sidebar — same shell
-     GroceryPanel uses, no dimming for the same reason (the dashboard stays visible behind
-     it on purpose). -->
-<button type="button" onclick={onClose} aria-label="Close tasks" class="absolute inset-0 z-10"
-></button>
-
-<!-- Translucent (bg-white/70), not blurred — DESIGN.md §2.4 rules out backdrop-filter/blur
-     on this hardware, same reasoning Screensaver.svelte's own overlay already follows. -->
-<div
-	class="absolute inset-y-0 right-0 z-20 flex {sizes.width} flex-col border-l border-slate-200 bg-white/70 shadow-xl dark:border-slate-700 dark:bg-slate-900/70"
->
-	<header
-		class="flex {sizes.headerHeight} shrink-0 items-center justify-between border-b border-slate-200 px-4 dark:border-slate-700"
-	>
-		<div class="flex items-baseline gap-2.5">
-			<h1 class="{sizes.title} font-semibold text-slate-900 dark:text-slate-100">Tasks</h1>
-			<p class="{sizes.subtitle} text-slate-500 dark:text-slate-400">
-				{tasks.count} due
-			</p>
-			{#if tasks.stale}
-				<!-- Same DESIGN.md §2.5 stale badge groceries shows for an AnyList outage. -->
-				<span
-					class="rounded bg-amber-100 {sizes.stale} font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300"
-				>
-					Can't reach Todoist right now
-				</span>
-			{/if}
-		</div>
-		<button
-			type="button"
-			onclick={onClose}
-			aria-label="Done"
-			class="flex {sizes.closeBtn} items-center justify-center rounded-full text-slate-500 active:bg-slate-100 dark:text-slate-400 dark:active:bg-slate-800"
-		>
-			✕
-		</button>
-	</header>
+<SidebarPanel {onClose} closeLabel="Close tasks" width={sizes.width}>
+	<PanelHeader
+		title="Tasks"
+		subtitle="{tasks.count} due"
+		staleMessage={tasks.stale ? "Can't reach Todoist right now" : null}
+		{onClose}
+		{sizes}
+	/>
 
 	<div class="flex-1 overflow-y-auto px-3 py-2">
 		{#if tasks.count === 0}
@@ -173,4 +131,4 @@
 			{/if}
 		{/if}
 	</div>
-</div>
+</SidebarPanel>

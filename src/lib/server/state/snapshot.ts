@@ -64,59 +64,11 @@ export interface WeekSnapshot {
 	days: SnapshotDay[];
 }
 
-export async function buildWeekSnapshot(
-	db: Db,
-	options: {
-		now: Date;
-		timeZone: string;
-		quietHours?: QuietHours;
-		/** Household's clock preference (settings' time_format) — default 24h. */
-		timeFormat?: TimeFormat;
-		/**
-		 * Restricts the result to these source ids (DESIGN.md §4/§7.5's visibility matrix,
-		 * resolved by the caller via visibility.ts). Omitted entirely — not just an empty
-		 * array — means "no per-user filtering", so this stays independently testable
-		 * without visibility fixtures in every existing test that doesn't care about it. An
-		 * explicit empty array is a real, valid case: a user with everything hidden.
-		 */
-		visibleSourceIds?: number[];
-	}
-): Promise<WeekSnapshot> {
-	const { now, timeZone } = options;
-	const quietHours = options.quietHours ?? DEFAULT_QUIET_HOURS;
-	const timeFormat = options.timeFormat ?? '24h';
-	const today = localDateInZone(now, timeZone);
-	// A rolling window from today, not a fixed Mon–Sun block: DESIGN.md §7.3 frames the
-	// week view as "a kitchen glance", and a fixed calendar week is mostly in the past by
-	// Thursday or Friday — dead space on a screen whose whole point is what's coming up.
-	const weekStart = today;
-	const weekEnd = addDaysToLocalDate(weekStart, 6);
-
-	// Fetch a deliberately generous UTC range and bucket by local date afterwards, rather
-	// than converting local midnight into a UTC instant. That inverse conversion is the
-	// DST-hazardous direction; this one is not, and two days of slack costs nothing at
-	// this volume.
-	const rangeStart = new Date(`${addDaysToLocalDate(weekStart, -2)}T00:00:00Z`);
-	const rangeEnd = new Date(`${addDaysToLocalDate(weekEnd, 2)}T23:59:59Z`);
-
-	const conditions = [
-		eq(sources.enabled, true),
-		or(
-			// Timed events, by instant.
-			and(gte(events.startsAt, rangeStart), lte(events.startsAt, rangeEnd)),
-			// All-day events overlapping the week, by plain string comparison.
-			and(
-				eq(events.allDay, true),
-				lte(events.localDate, weekEnd),
-				or(gte(events.localEndDate, weekStart), isNull(events.localEndDate))
-			)
-		)
-	];
-	if (options.visibleSourceIds !== undefined) {
-		conditions.push(inArray(sources.id, options.visibleSourceIds));
-	}
-
-	const rows = await db
+// The query buildWeekSnapshot actually runs (below) — factored out so EventRow can be
+// derived from its real return shape instead of a hand-maintained copy that could drift
+// from the select() projection without a compile error to catch it.
+function eventRowsQuery(db: Db) {
+	return db
 		.select({
 			id: events.id,
 			title: events.title,
@@ -130,9 +82,22 @@ export async function buildWeekSnapshot(
 			groupLabel: sources.groupLabel
 		})
 		.from(events)
-		.innerJoin(sources, eq(events.sourceId, sources.id))
-		.where(and(...conditions));
+		.innerJoin(sources, eq(events.sourceId, sources.id));
+}
 
+export type EventRow = Awaited<ReturnType<typeof eventRowsQuery>>[number];
+
+// Buckets the week's rows by local date, one Map entry per day in [weekStart, weekStart+6].
+// Pulled out of buildWeekSnapshot so the all-day/timed-event bucketing logic (including the
+// past-midnight endMinutes clamp) can be read and changed on its own. Exported for direct
+// unit tests (snapshot.test.ts) alongside buildWeekSnapshot's own DB-backed integration
+// coverage of the same logic.
+export function bucketEventsByDay(
+	rows: EventRow[],
+	weekStart: string,
+	timeZone: string,
+	timeFormat: TimeFormat
+): Map<string, SnapshotEvent[]> {
 	const byDate = new Map<string, SnapshotEvent[]>();
 	for (let i = 0; i < 7; i += 1) {
 		byDate.set(addDaysToLocalDate(weekStart, i), []);
@@ -188,6 +153,74 @@ export async function buildWeekSnapshot(
 		}
 	}
 
+	return byDate;
+}
+
+// The grid shows the complement of the dark window — waking hours start when quiet hours
+// end, and end when quiet hours begin. Exported for direct unit tests.
+export function computeDisplayHours(quietHours: QuietHours): { start: number; end: number } {
+	return {
+		start: Math.ceil(quietHours.endMinutes / 60),
+		end: Math.floor(quietHours.startMinutes / 60)
+	};
+}
+
+export async function buildWeekSnapshot(
+	db: Db,
+	options: {
+		now: Date;
+		timeZone: string;
+		quietHours?: QuietHours;
+		/** Household's clock preference (settings' time_format) — default 24h. */
+		timeFormat?: TimeFormat;
+		/**
+		 * Restricts the result to these source ids (DESIGN.md §4/§7.5's visibility matrix,
+		 * resolved by the caller via visibility.ts). Omitted entirely — not just an empty
+		 * array — means "no per-user filtering", so this stays independently testable
+		 * without visibility fixtures in every existing test that doesn't care about it. An
+		 * explicit empty array is a real, valid case: a user with everything hidden.
+		 */
+		visibleSourceIds?: number[];
+	}
+): Promise<WeekSnapshot> {
+	const { now, timeZone } = options;
+	const quietHours = options.quietHours ?? DEFAULT_QUIET_HOURS;
+	const timeFormat = options.timeFormat ?? '24h';
+	const today = localDateInZone(now, timeZone);
+	// A rolling window from today, not a fixed Mon–Sun block: DESIGN.md §7.3 frames the
+	// week view as "a kitchen glance", and a fixed calendar week is mostly in the past by
+	// Thursday or Friday — dead space on a screen whose whole point is what's coming up.
+	const weekStart = today;
+	const weekEnd = addDaysToLocalDate(weekStart, 6);
+
+	// Fetch a deliberately generous UTC range and bucket by local date afterwards, rather
+	// than converting local midnight into a UTC instant. That inverse conversion is the
+	// DST-hazardous direction; this one is not, and two days of slack costs nothing at
+	// this volume.
+	const rangeStart = new Date(`${addDaysToLocalDate(weekStart, -2)}T00:00:00Z`);
+	const rangeEnd = new Date(`${addDaysToLocalDate(weekEnd, 2)}T23:59:59Z`);
+
+	const conditions = [
+		eq(sources.enabled, true),
+		or(
+			// Timed events, by instant.
+			and(gte(events.startsAt, rangeStart), lte(events.startsAt, rangeEnd)),
+			// All-day events overlapping the week, by plain string comparison.
+			and(
+				eq(events.allDay, true),
+				lte(events.localDate, weekEnd),
+				or(gte(events.localEndDate, weekStart), isNull(events.localEndDate))
+			)
+		)
+	];
+	if (options.visibleSourceIds !== undefined) {
+		conditions.push(inArray(sources.id, options.visibleSourceIds));
+	}
+
+	const rows = await eventRowsQuery(db).where(and(...conditions));
+
+	const byDate = bucketEventsByDay(rows, weekStart, timeZone, timeFormat);
+
 	const days: SnapshotDay[] = [];
 	for (let i = 0; i < 7; i += 1) {
 		const date = addDaysToLocalDate(weekStart, i);
@@ -204,12 +237,7 @@ export async function buildWeekSnapshot(
 		days.push({ date, weekday: weekdayAbbrev(date), isToday: date === today, events: list });
 	}
 
-	// The grid shows the complement of the dark window — waking hours start when quiet
-	// hours end, and end when quiet hours begin.
-	const displayHours = {
-		start: Math.ceil(quietHours.endMinutes / 60),
-		end: Math.floor(quietHours.startMinutes / 60)
-	};
+	const displayHours = computeDisplayHours(quietHours);
 
 	// Deliberately carries no wall-clock timestamp. The broadcaster decides whether to push
 	// by comparing serialised payloads, and a "generated at" field would differ on every

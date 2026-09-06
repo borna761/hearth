@@ -2,6 +2,7 @@
 	import type { SnapshotDay } from '$lib/server/state/snapshot';
 	import { layoutHourColumn, minutesToRangePercent } from '$lib/week/hourLayout';
 	import { formatMinutes, formatMinutesRange, type TimeFormat } from '$lib/week/format';
+	import { dayNumber } from '$lib/datetime';
 
 	let {
 		days,
@@ -33,10 +34,6 @@
 
 	function nowLineTop(minutes: number): number {
 		return minutesToRangePercent(minutes, HOUR_START, HOUR_END);
-	}
-
-	function dayNumber(date: string): string {
-		return String(Number(date.slice(8, 10)));
 	}
 </script>
 

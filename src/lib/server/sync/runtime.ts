@@ -31,9 +31,16 @@ const STATE_TICK_MS = 60_000;
 const WEATHER_INTERVAL_MS = 15 * 60_000;
 /** DESIGN.md §7.1: the screensaver cross-fades to a new slide every 30s. */
 const SCREENSAVER_TICK_MS = 30_000;
-/** docs/phase-5-plan.md §2.1: the actual freshness guarantee for groceries, independent
- *  of whether AnyList's push channel is still alive. */
-const GROCERIES_POLL_INTERVAL_MS = 15 * 60_000;
+/** docs/phase-5-plan.md §2.1 / docs/phase-6-todoist-plan.md §7: the actual freshness
+ *  guarantee for both groceries and tasks, independent of whether AnyList's push channel is
+ *  still alive (tasks has no push channel at all — Todoist's REST API has nothing
+ *  comparable to AnyList's websocket, so polling is its only freshness signal). Shared by
+ *  both so the two can't silently drift apart from one being edited without the other —
+ *  if groceries' and tasks' freshness needs ever genuinely diverge (e.g. a Todoist rate
+ *  limit forces a longer interval there), split this back into two named constants rather
+ *  than special-casing one call site off a shared value. */
+const RESOURCE_POLL_INTERVAL_MS = 15 * 60_000;
+const GROCERIES_POLL_INTERVAL_MS = RESOURCE_POLL_INTERVAL_MS;
 /** docs/phase-5-plan.md §2.2: collapses a burst of rapid edits (someone adding several
  *  items in a row) into one reconcile instead of one per item. */
 const GROCERIES_PUSH_DEBOUNCE_MS = 2_000;
@@ -47,11 +54,7 @@ const GROCERIES_PUSH_DEBOUNCE_MS = 2_000;
  * above to comfortably cover AnyList's own round-trip latency on top of it.
  */
 const GROCERIES_ECHO_SUPPRESS_MS = 6_000;
-/** docs/phase-6-todoist-plan.md §7: matches groceries' own freshness guarantee. No push
- *  channel to debounce against here — Todoist's REST API has nothing comparable to
- *  AnyList's websocket, so polling is the only freshness signal there is at all, not one
- *  of two. */
-const TASKS_POLL_INTERVAL_MS = 15 * 60_000;
+const TASKS_POLL_INTERVAL_MS = RESOURCE_POLL_INTERVAL_MS;
 
 let started = false;
 let groceriesStarted = false;

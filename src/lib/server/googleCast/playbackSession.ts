@@ -10,6 +10,7 @@
 // meaningfully more complex work of surviving a restart.
 import {
 	playFolderOnSpeaker as realPlayFolderOnSpeaker,
+	safeClose,
 	type CastTrack,
 	type ClientLike,
 	type MediaPlayerLike,
@@ -89,21 +90,6 @@ function raceCallback<T>(
 			resolve({ err: err ?? null, value });
 		});
 	});
-}
-
-/** castv2's own Client#close does `this.socket.destroy()` with no null check — if the
- *  connection already closed itself (the device dropped it, a natural disconnect), the
- *  socket is already null and that throws synchronously. Closing a session we're about to
- *  discard anyway shouldn't be able to crash the caller — confirmed live: an unguarded
- *  close() here took down the entire play/toggle/next request with an uncaught exception,
- *  which SvelteKit turned into a non-JSON 500 the panel couldn't parse, showing a generic
- *  "couldn't play" error with no indication this was the actual cause. */
-function safeClose(client: ClientLike): void {
-	try {
-		client.close();
-	} catch {
-		// Already gone — exactly the state this was trying to reach anyway.
-	}
 }
 
 function applyStatus(session: PlaybackSession, status: MediaStatus): void {

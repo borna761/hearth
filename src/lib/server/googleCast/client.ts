@@ -93,8 +93,12 @@ function defaultCreateClient(): ClientLike {
 /** castv2's own Client#close does `this.socket.destroy()` with no null check — if the
  *  connection already died on its own (the exact scenario a failure path is often reacting
  *  to), the socket is already null and that throws, which would otherwise mask the real
- *  error this function is trying to reject with. */
-function safeClose(client: ClientLike): void {
+ *  error this function is trying to reject with. Also used by playbackSession.ts: an
+ *  unguarded close() there once took down an entire play/toggle/next request with an
+ *  uncaught exception, which SvelteKit turned into a non-JSON 500 the panel couldn't parse
+ *  — confirmed live, showing a generic "couldn't play" error with no indication this was
+ *  the actual cause. */
+export function safeClose(client: ClientLike): void {
 	try {
 		client.close();
 	} catch {
